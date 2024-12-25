@@ -53,16 +53,17 @@ function RPCServer:new(modemName, hostname)
     instance.modem = modemName
     instance.isRunning = false
     instance.services = {}
+
+    if not rednet.isOpen(self.modem) then
+        rednet.open(self.modem)
+    end
+
     return instance
 end
 
 function RPCServer:start()
     if self.isRunning then
         return
-    end
-
-    if not rednet.isOpen(self.modem) then
-        rednet.open(self.modem)
     end
 
     rednet.host(PROTOCOL_ID, self.hostname)
@@ -151,4 +152,129 @@ function RPCServer:run()
     while true do
         self:receive(0.1)
     end
+end
+
+local RPCClient = {}
+RPCClient.__index = RPCClient
+
+function RPCClient:new(modemName, timeout)
+    local instance = setmetatable({}, self)
+    instance.modem = modemName
+    instance.host = nil
+    instance.timeout = timeout or 2
+
+    if not rednet.isOpen(modemName) then
+        rednet.open(modemName)
+    end
+
+    return instance
+end
+
+function RPCClient:discover()
+    local hosts = {rednet.lookup(PROTOCOL_ID)}
+    return hosts
+end
+
+function RPCClient:associate(hostId)
+    self.host = hostId
+end
+
+function RPCClient:disassociate()
+    self.host = nil
+    self.pendingRequests = {}
+end
+
+function RPCClient:_handleResponse(response)
+    local requestId = response.id
+    if self.pendingRequests[requestId] then
+        self.pendingRequests[requestId].response = response
+        self.pendingRequests[requestId].received = true
+    end
+end
+
+function RPCClient:_waitForResponse(requestId)
+    local start = os.clock()
+    while os.clock() - start < self.timeout do
+        local senderId, response, protocol = rednet.receive(PROTOCOL_ID, 0.5)
+        if senderId == self.host and protocol == PROTOCOL_ID and type(response) == "table" then
+            self:_handleResponse(response)
+            if self.pendingRequests[requestId] and self.pendingRequests[requestId].received then
+                return true, self.pendingRequests[requestId].response
+            end
+        end
+    end
+    return false, "Request timed out."
+end
+
+function RPCClient:listServices(serviceName)
+    if not self.host then
+        return false, "No host associated."
+    end
+
+    local request = listRequest(serviceName)
+    self.pendingRequests[request.id] = {response = nil, received = false}
+    rednet.send(self.host, request, PROTOCOL_ID)
+
+    local success, response = self:_waitForResponse(request.id)
+    self.pendingRequests[request.id] = nil
+
+    if not success then
+        return false, response
+    end
+
+    if response.success then
+        return true, response.result
+    else
+        return false, response.message
+    end
+end
+
+function RPCClient:call(service, method, ...)
+    if not self.host then
+        return false, "No host associated."
+    end
+
+    local args = {...}
+    local request = callRequest(service, method, args)
+    self.pendingRequests[request.id] = {response = nil, received = false}
+    rednet.send(self.host, request, PROTOCOL_ID)
+
+    local success, response = self:_waitForResponse(request.id)
+    self.pendingRequests[request.id] = nil
+
+    if not success then
+        return false, response
+    end
+
+    if response.success then
+        return true, response.result
+    else
+        return false, response.message
+    end
+end
+
+function RPCClient:wrapService(serviceName)
+    if not self.host then
+        return false, "No host associated."
+    end
+
+    local success, methods = self:listServices(serviceName)
+    if not success then
+        return false, methods
+    end
+
+    local proxy = {}
+
+    for _, methodName in ipairs(methods) do
+        proxy[methodName] = function(...)
+            local callSuccess, result = self:call(serviceName, methodName, ...)
+            if callSuccess then
+                return true, result
+            else
+                return false, result
+            end
+        end
+    end
+
+    return true, proxy
 end
