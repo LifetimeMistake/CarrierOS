@@ -6,11 +6,12 @@ local function generateRequestId()
     return tostring(os.clock()):gsub("%.", "") .. math.random(1000, 999999)
 end
 
-local function callRequest(method, args)
+local function callRequest(service, method, args)
     return {
         id = generateRequestId(),
         type = REQUEST_TYPE,
         command = "call",
+        service =  service,
         method = method,
         args = args
     }
@@ -95,37 +96,59 @@ function RPCServer:unregisterService(name)
     return true
 end
 
-function RPCServer:handleRequest(message)
-    local requestType = message.type
-    local response = { id = message.id, type = "rpc_response" }
+function RPCServer:handleRequest(request)
+    local requestType = request.type
 
     if requestType == "list" then
-        
+        local data = {}
+        if request.service then
+            local service = self.services[request.service]
+            if not service or not service[request.method] then
+                return responseErr(request, "Object not found")
+            end
+
+            for k, _ in pairs(service) do 
+                table.insert(data, k)
+            end
+        else
+            for name, service in pairs(self.services) do
+                local t = {}
+                for k, _ in pairs(service) do
+                    table.insert(t, k)
+                end
+                data[name] = t
+            end
+        end
+
+        return responseOk(request, data)
     elseif requestType == "call" then
+        local service = self.services[request.service]
+        if not service or not service[request.method] then
+            return responseErr(request, "Object not found")
+        end
 
+        local method = service[request.method]
+        local success, result = pcall(method, table.unpack(request.args))
+        if success then
+            return responseOk(request, result)
+        else
+            return responseErr(request, result)
+        end
     else
-        response.type = "rpc_response"
+        return responseErr(request, "Unsupported protocol command")
     end
+end
 
-
-    local service = self.services[message.service]
-
-    if service and service[message.method] then
-        local success, result = pcall(service[message.method], table.unpack(message.args))
-        response.success = success
-        response.result = success and result or tostring(result)
-    else
-        response.success = false
-        response.result = "Service or method not found"
+function RPCServer:receive(timeout)
+    local senderId, message, protocol = rednet.receive(PROTOCOL_ID, timeout)
+    if senderId and message and type(message) == "table" and message.type == REQUEST_TYPE then
+        local response = self:handleRequest(message)
+        rednet.send(senderId, response, protocol)
     end
 end
 
 function RPCServer:run()
     while true do
-        local senderId, message, protocol = rednet.receive(PROTOCOL_ID, 0.1)
-        if senderId and message and type(message) == "table" and message.type == REQUEST_TYPE then
-            local response = self:handleRequest(message)
-            rednet.send(senderId, response, protocol)
-        end
+        self:receive(0.1)
     end
 end
