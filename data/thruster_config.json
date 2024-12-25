@@ -1,0 +1,124 @@
+{
+    "thrust_right": {
+        "type": "main",
+        "powerSide": "bottom",
+        "integrator": "redstoneIntegrator_23",
+        "directionSide": "back",
+        "normalDirection": "normal",
+        "thrustSide": "left",
+        "thrustVector": {
+            "y": 0,
+            "x": 0,
+            "z": 1
+        }
+    },
+    "main_front_right": {
+        "type": "main",
+        "powerSide": "bottom",
+        "integrator": "redstoneIntegrator_16",
+        "normalDirection": "normal",
+        "thrustSide": "left",
+        "thrustVector": {
+            "y": 1,
+            "x": 0,
+            "z": 0
+        }
+    },
+    "corr_front_right": {
+        "type": "main",
+        "powerSide": "bottom",
+        "integrator": "redstoneIntegrator_22",
+        "normalDirection": "normal",
+        "thrustSide": "right",
+        "thrustVector": {
+            "y": 0,
+            "x": 1,
+            "z": 0
+        }
+    },
+    "corr_front_left": {
+        "type": "main",
+        "powerSide": "bottom",
+        "integrator": "redstoneIntegrator_21",
+        "normalDirection": "normal",
+        "thrustSide": "left",
+        "thrustVector": {
+            "y": 0,
+            "x": -1,
+            "z": 0
+        }
+    },
+    "corr_back_right": {
+        "type": "main",
+        "powerSide": "bottom",
+        "integrator": "redstoneIntegrator_19",
+        "normalDirection": "normal",
+        "thrustSide": "left",
+        "thrustVector": {
+            "y": 0,
+            "x": 1,
+            "z": 0
+        }
+    },
+    "main_front_left": {
+        "type": "main",
+        "powerSide": "bottom",
+        "integrator": "redstoneIntegrator_18",
+        "normalDirection": "normal",
+        "thrustSide": "right",
+        "thrustVector": {
+            "y": 1,
+            "x": 0,
+            "z": 0
+        }
+    },
+    "corr_back_left": {
+        "type": "main",
+        "powerSide": "bottom",
+        "integrator": "redstoneIntegrator_20",
+        "normalDirection": "normal",
+        "thrustSide": "right",
+        "thrustVector": {
+            "y": 0,
+            "x": -1,
+            "z": 0
+        }
+    },
+    "thrust_left": {
+        "type": "main",
+        "powerSide": "bottom",
+        "integrator": "redstoneIntegrator_24",
+        "directionSide": "back",
+        "normalDirection": "normal",
+        "thrustSide": "right",
+        "thrustVector": {
+            "y": 0,
+            "x": 0,
+            "z": 1
+        }
+    },
+    "main_back_right": {
+        "type": "main",
+        "powerSide": "bottom",
+        "integrator": "redstoneIntegrator_15",
+        "normalDirection": "normal",
+        "thrustSide": "right",
+        "thrustVector": {
+            "y": 1,
+            "x": 0,
+            "z": 0
+        }
+    },
+    "main_back_left": {
+        "type": "main",
+        "powerSide": "bottom",
+        "integrator": "redstoneIntegrator_17",
+        "normalDirection": "normal",
+        "thrustSide": "left",
+        "thrustVector": {
+            "y": 1,
+            "x": 0,
+            "z": 0
+        }
+    }
+}

@@ -1,0 +1,38 @@
+{
+    "autopilot": {
+        "arrivalThreshold": 2.5,
+        "slowdownThreshold": 80,
+        "speedLimit": 20
+    },
+    "thrusterWindupTicks": 3,
+    "DELTA_K": 0.0075,
+    "specialThrusterMap": {
+        "main": {
+            "BR": "main_back_right",
+            "BL": "main_back_left",
+            "FR": "main_front_right",
+            "FL": "main_front_left"
+        },
+        "rotSmall": {
+            "BR": "corr_back_left",
+            "BL": "corr_back_left",
+            "FR": "corr_front_right",
+            "FL": "corr_front_left"
+        }
+    },
+    "pitchPID": {
+        "kp": 1.25,
+        "ki": 0.25,
+        "kd": 0.1,
+        "mi": 5.0,
+        "id": 0.975
+    },
+    "rollPID": {
+        "kp": 1.25,
+        "ki": 0.25,
+        "kd": 0.1,
+        "mi": 5.0,
+        "id": 0.975
+    },
+    "tickRate": 1
+}

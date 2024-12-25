@@ -1,0 +1,14 @@
+{
+    "Lua.diagnostics.globals": [
+        "fs",
+        "textutils",
+        "peripheral",
+        "read",
+        "sleep",
+        "ship",
+        "rednet"
+    ],
+    "Lua.diagnostics.disable": [
+        "duplicate-set-field"
+    ]
+}
