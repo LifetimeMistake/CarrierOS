@@ -1,8 +1,8 @@
 local stabilizer_api = require("components.stabilizer")
 local autopilot_api = require("components.autopilot")
-local thrust_api = require("apis.thrusters")
-local serialization = require("apis.serialization")
-local math3d = require("apis.math3d")
+local thrust_api = require("libs.thrusters")
+local serialization = require("libs.serialization")
+local math3d = require("libs.math3d")
 
 local function loadThrustProfiles()
     local profiles = {}

@@ -1,6 +1,6 @@
-local math3d = require("apis.math3d")
+local math3d = require("libs.math3d")
 local Vector3 = math3d.Vector3
-require("apis.shipExtensions")
+require("libs.shipExtensions")
 local cb = peripheral.wrap("right")
 
 local vec = Vector3.new(0, 0, 1)

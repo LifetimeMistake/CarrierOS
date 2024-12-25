@@ -1,5 +1,5 @@
-local thrust_api = require("apis.thrusters")
-local serialization = require("apis.serialization")
+local thrust_api = require("libs.thrusters")
+local serialization = require("libs.serialization")
 
 local function getEngineAPI()
     local status, data = serialization.native.loadf("engine_config.txt")

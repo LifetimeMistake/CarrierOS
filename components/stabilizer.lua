@@ -1,7 +1,7 @@
-local PID = require("apis.pid")
-local math3d = require("apis.math3d")
-local utils = require("apis.utils")
-require("apis.shipExtensions")
+local PID = require("libs.pid")
+local math3d = require("libs.math3d")
+local utils = require("libs.utils")
+require("libs.shipExtensions")
 
 local Vector3 = math3d.Vector3
 local WORLD_GRAVITY = Vector3.new(0, -10, 0)
