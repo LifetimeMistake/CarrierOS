@@ -31,7 +31,8 @@
         "printError",
         "write",
         "read",
-        "sleep"
+        "sleep",
+        "ship"
     ],
     "Lua.runtime.builtin": {
         "bit32": "enable",
