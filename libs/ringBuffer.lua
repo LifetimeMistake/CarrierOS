@@ -46,3 +46,5 @@ function RingBuffer:iter()
         end
     end
 end
+
+return RingBuffer
