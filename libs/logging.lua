@@ -21,7 +21,24 @@ LogLevel.tostring = function(level)
         return "ERROR"
     end
 
-    error("Unknown log level")
+    return nil
+end
+
+LogLevel.fromstring = function(level)
+    if level == "DEBUG" then
+        return LogLevel.DEBUG
+    end
+    if level == "INFO" then
+        return LogLevel.INFO
+    end
+    if level == "WARN" then
+        return LogLevel.WARN
+    end
+    if level == "ERROR" then
+        return LogLevel.ERROR
+    end
+
+    return nil
 end
 
 local Logger = {}
