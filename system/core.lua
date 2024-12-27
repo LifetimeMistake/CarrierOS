@@ -58,8 +58,13 @@ function kernel.loadSubsystem(name, api)
         error("Subsystem '" .. name .. "' is already registered", 2)
     end
 
+    if kernel[name] then
+        error("Subsystem name '" .. name .. "' is reserved by the kernel")
+    end
+
     printk("Loading subsystem: " .. name)
     kernel.subsystems[name] = api
+    kernel[name] = api
 end
 
 function kernel.getSubsystem(name)
@@ -88,6 +93,16 @@ local function requireSubsystem(name)
     kernel.loadSubsystem(ko.name, ko.exports)
 end
 
+settings.define("kernel.init_program", {
+    default = "",
+    description = "[[The program to run after the kernel finishes booting. Starts the CC shell if this setting is invalid.]]",
+    type = "string"
+})
+
+local function getPID()
+    return kernel.process.getCurrentProcessID()
+end
+
 local function boot()
     -- Load kernel subsystems
     requireSubsystem("system.logging")
@@ -96,8 +111,22 @@ local function boot()
     printk("Kernel load complete")
     printk("Loaded " .. #kernel.listSubsystems() .. " subsystems")
 
-    printk("Starting init process")
-    os.sleep(60)
+    printk("Transferring control to init process")
+    local uInit = settings.get("kernel.init_program", "")
+    local initPath
+    if uInit ~= "" and fs.exists(uInit) and not fs.isDir(uInit) then
+        initPath = uInit
+    elseif term.isColour() and settings.get("bios.use_multishell") then
+        initPath = "rom/programs/advanced/multishell.lua"
+    else
+        initPath = "rom/programs/shell.lua"
+    end
+    
+    kernel.process.runFile(initPath)
+    kernel.process.runScheduler()
+
+    printk("Kernel finished. Halt.")
+    os.sleep(1)
 end
 
 boot()
