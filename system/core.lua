@@ -111,15 +111,18 @@ local function boot()
     printk("Kernel load complete")
     printk("Loaded " .. #kernel.listSubsystems() .. " subsystems")
 
+    printk("Bug workaround: Disabling multishell")
+    settings.set("bios.use_multishell", false)
+    
     printk("Transferring control to init process")
     local uInit = settings.get("kernel.init_program", "")
     local initPath
     if uInit ~= "" and fs.exists(uInit) and not fs.isDir(uInit) then
         initPath = uInit
     elseif term.isColour() and settings.get("bios.use_multishell") then
-        initPath = "rom/programs/advanced/multishell.lua"
+        initPath = "/rom/programs/advanced/multishell.lua"
     else
-        initPath = "rom/programs/shell.lua"
+        initPath = "/rom/programs/shell.lua"
     end
     
     kernel.process.runFile(initPath)
