@@ -73,6 +73,10 @@ local function loadThrusterAPI(thrustProfiles, updateLength)
     if peripheral.protect then
         for k,v in pairs(tapi.thrusters) do
             local name = peripheral.getName(v.data.integrator)
+            if peripheral.isProtected(name) then
+                peripheral.unprotect(name)
+            end
+            
             peripheral.protect(name, "w")
         end
     end
@@ -428,13 +432,20 @@ local api = {
 }
 
 -- Attempt to publish API
-_G.carrieros = api
 do
+    if _G.carrieros then
+        local success, err = pcall(api_factory.unpublish, "carrieros")
+        if not success then
+            log.warn("Failed to clean up previous CarrierOS API: " .. tostring(err))
+        end
+    end
+
     local success, err = pcall(api_factory.publish, "carrieros", api)
     if not success then
         log.warn("Failed to publish system-wide CarrierOS API: " .. tostring(err))
     end
 end
+_G.carrieros = api
 
 -- Function to handle stabilizer updates
 local now = 0
