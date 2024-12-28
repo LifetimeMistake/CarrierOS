@@ -176,6 +176,15 @@ function exports.getProcessObject(pid)
     return process
 end
 
+function exports.setPrivileged(pid, value)
+    local process = processes[pid]
+    if not process then
+        error("Invalid PID", 2)
+    end
+    
+    process.privileged = value
+end
+
 function exports.processExists(pid)
     return processes[pid] ~= nil
 end
@@ -356,7 +365,7 @@ end
 -- Process management operations
 function processAPI.kill(pid)
     local currentPID = exports.getCurrentProcessID()
-    if not pid then
+    if not currentPID then
         log.error("Used userspace protect API from kernel-space. Aborting.")
         error("Kernel error")
     end
@@ -399,6 +408,26 @@ function processAPI.runFunction(name, func, privileged, env, isolated)
     end
     local proc = exports.runFunc(name, func, privileged, env, isolated)
     return proc.pid
+end
+
+function processAPI.setPrivileged(pid, value)
+    checkPrivileged()
+    exports.setPrivileged(pid, value)
+end
+
+function processAPI.dropPrivileges()
+    local pid = exports.getCurrentProcessID()
+    if not pid then
+        log.error("Used userspace protect API from kernel-space. Aborting.")
+        error("Kernel error")
+    end
+    
+    local currentProc = exports.getProcessObject(pid)
+    if not currentProc.privileged then
+        error("Current process not privileged")
+    end
+
+    exports.setPrivileged(pid, false)
 end
 
 -- Update the create hook to inject our API along with the safe coroutine and OS libraries

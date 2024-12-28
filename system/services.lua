@@ -207,6 +207,22 @@ function servicesAPI.getLogs(name)
     return logs
 end
 
+function servicesAPI.getCurrentService()
+    local pid = kernel.process.getCurrentProcessID()
+    if not pid then
+        log.error("Used userspace services API from kernel-space. Aborting.")
+        error("Kernel error")
+    end
+    
+    for k,v in pairs(services) do
+        if v.pid == pid then
+            return servicesAPI.status(k)
+        end
+    end
+
+    return nil
+end
+
 -- Management operations (requires privilege check)
 function servicesAPI.register(name, filepath, options)
     checkPrivileged()
