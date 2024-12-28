@@ -11,11 +11,12 @@ function ko.new()
     }
 end
 
-function ko.subsystem(name, exports)
+function ko.subsystem(name, exports, entrypoint)
     local subsystem = ko.new()
     subsystem.name = name
     subsystem.is_kernel_subsystem = true
     subsystem.exports = exports
+    subsystem.load_func = entrypoint
 
     return subsystem
 end

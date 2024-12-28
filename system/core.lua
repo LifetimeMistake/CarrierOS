@@ -5,7 +5,8 @@ end
 -- Protect kernel and exports
 local kernel = {
     subsystems = {},
-    exports = {}
+    exports = {},
+    kthreads = {}
 }
 
 local function createKernelOverlay()
@@ -53,7 +54,7 @@ end
 local expect = require("cc.expect").expect
 local exception = require "cc.internal.exception"
 
-function kernel.loadSubsystem(name, api)
+function kernel.loadSubsystem(name, api, load_func)
     if kernel.subsystems[name] then
         error("Subsystem '" .. name .. "' is already registered", 2)
     end
@@ -65,6 +66,10 @@ function kernel.loadSubsystem(name, api)
     printk("Loading subsystem: " .. name)
     kernel.subsystems[name] = api
     kernel[name] = api
+    
+    if load_func then
+        load_func(kernel)
+    end
 end
 
 function kernel.getSubsystem(name)
@@ -90,7 +95,7 @@ local function requireSubsystem(name)
         error("Loaded file is not a valid kernel subsystem", 2)
     end
 
-    kernel.loadSubsystem(ko.name, ko.exports)
+    kernel.loadSubsystem(ko.name, ko.exports, ko.load_func)
 end
 
 settings.define("kernel.init_program", {
@@ -104,6 +109,45 @@ settings.define("kernel.debug", {
     description = "[[Exposes the kernel interface to userspace if enabled.]]",
     type = "boolean"
 })
+
+function kernel.registerKThread(name, thread_func)
+    if type(thread_func) ~= "function" then
+        error("Thread function must be a function", 2)
+    end
+    
+    local co = coroutine.create(thread_func)
+    table.insert(kernel.kthreads, {
+        name = name,
+        co = co
+    })
+    return co
+end
+
+function kernel.runKernelScheduler()
+    local eventData = { n = 0 }
+    while true do
+        local hasThreads = false
+        for i, thread in ipairs(kernel.kthreads) do
+            if coroutine.status(thread.co) ~= "dead" then
+                hasThreads = true
+                local ok, err = coroutine.resume(thread.co, eventData)
+                if not ok then
+                    local name = thread.name or ("kthread:" .. i)
+                    printError("Error in kernel thread " .. name .. ": " .. tostring(err))
+                    table.remove(kernel.kthreads, i)
+                end
+            else
+                table.remove(kernel.kthreads, i)
+            end
+        end
+        
+        if not hasThreads then
+            break
+        end
+        
+        eventData = table.pack(os.pullEventRaw())
+    end
+end
 
 local function boot()
     -- Load kernel subsystems
@@ -135,12 +179,13 @@ local function boot()
     else
         initPath = "/rom/programs/shell.lua"
     end
+    kernel.process.runFile(initPath, nil, true)
     
-    kernel.process.runFile(initPath, true)
-    kernel.process.runScheduler()
+    printk("Starting kernel threads")
+    kernel.runKernelScheduler()
 
     printk("Kernel finished. Halt.")
-    os.sleep(30)
+    os.sleep(10)
 end
 
 boot()

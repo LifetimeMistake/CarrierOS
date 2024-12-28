@@ -184,8 +184,7 @@ function exports.list()
     return processes
 end
 
-function exports.runScheduler()
-    local eventData = { n = 0 }
+local function processSchedulerThread(eventData)
     while true do
         local hasProcesses = false
         for _, process in pairs(processes) do
@@ -195,7 +194,7 @@ function exports.runScheduler()
 
         -- Exit if there are no active processes
         if not hasProcesses then
-            printk("All processes have exited. Exiting kernel scheduler.")
+            printk("All processes have exited. Exiting process scheduler.")
             return
         end
 
@@ -219,7 +218,7 @@ function exports.runScheduler()
         end
 
         -- Wait for events and pass them to processes
-        eventData = table.pack(os.pullEventRaw())
+        eventData = coroutine.yield()
     end
 end
 
@@ -306,4 +305,8 @@ exports.registerCreateHook(function(process)
     process.env.os = safeOSLib
 end)
 
-return ko.subsystem("process", exports)
+local function init(kernel)
+    kernel.registerKThread("process_scheduler", processSchedulerThread)
+end
+
+return ko.subsystem("process", exports, init)
