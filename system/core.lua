@@ -154,6 +154,7 @@ local function boot()
     requireSubsystem("system.logging")
     requireSubsystem("system.process")
     requireSubsystem("system.peripheral")
+    requireSubsystem("system.services")
 
     if settings.get("kernel.debug", false) then
         kernel.process.registerCreateHook(function(process)
