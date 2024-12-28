@@ -15,7 +15,8 @@ services.register(
     "/carrieros.lua",
     {
         restartPolicy = "on-failure:5",
-        loggerCapacity = 100
+        loggerCapacity = 100,
+        privileged = true
     }
 )
 

@@ -50,7 +50,8 @@ function exports.register(name, filepath, options)
         failureCount = 0,
         process = nil,
         logger = logger,
-        env = options.env or {}
+        env = options.env or {},
+        privileged = options.privileged or false
     }
     
     log.info("Service created: " .. name)
@@ -101,7 +102,7 @@ function exports.start(name)
     service.process = kernel.process.runFile(
         service.filepath,
         nil,  -- no args
-        false,  -- non-privileged by default
+        service.privileged,  -- use the privileged flag from service config
         env
     )
     
@@ -160,7 +161,8 @@ function exports.status(name)
         failureCount = service.failureCount,
         restartPolicy = service.restartPolicy,
         filepath = service.filepath,
-        logger = service.logger
+        logger = service.logger,
+        privileged = service.privileged
     }
 end
 
