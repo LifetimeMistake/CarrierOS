@@ -47,14 +47,7 @@ local function makeEntrypoint(entrypoint, env)
     end
 end
 
-function exports.runFunc(name, entrypoint, env, isolated)
-    if #processes >= processLimit then
-        error("Process limit reached", 2)
-    end
-    if type(entrypoint) ~= "function" then
-        error("Entrypoint must be a function", 2)
-    end
-
+local function createProcessObject(name, env, isolated)
     local processEnv
     if isolated then
         if not env then
@@ -63,28 +56,46 @@ function exports.runFunc(name, entrypoint, env, isolated)
 
         processEnv = env
     else
-        local rootEnv = createSafeEnvironment()
-        processEnv = setmetatable(env or {}, { __index = rootEnv })
+        processEnv = createSafeEnvironment()
+        if env then
+            for k,v in pairs(env) do
+                processEnv[k] = v
+            end
+        end
     end
 
-    local pid = generatePID()
-    local wrappedEntrypoint = coroutine.create(makeEntrypoint(entrypoint, processEnv))
-
     local process = {
-        pid = pid,
+        pid = generatePID(),
         name = name or "<unnamed>",
-        entrypoint = wrappedEntrypoint,
         env = processEnv,
         data = {},
         status = "running",
     }
 
-    -- Execute create hooks
     executeHooks(createHooks, process)
-
-    processes[pid] = process
-    coroutines[wrappedEntrypoint] = pid
     return process
+end
+
+local function submitProcessObject(po, entrypoint)
+    log.debug("Spawning process " .. po.pid)
+
+    local wrappedEntrypoint = coroutine.create(makeEntrypoint(entrypoint, po.env))
+    po.entrypoint = wrappedEntrypoint
+    processes[po.pid] = po
+    coroutines[wrappedEntrypoint] = po.pid
+    return po
+end
+
+function exports.runFunc(name, entrypoint, env, isolated)
+    if #processes >= processLimit then
+        error("Process limit reached", 2)
+    end
+    if type(entrypoint) ~= "function" then
+        error("Entrypoint must be a function", 2)
+    end
+
+    local process = createProcessObject(name, env, isolated)
+    return submitProcessObject(process, entrypoint)
 end
 
 function exports.runFile(path, args, env, isolated)
@@ -96,19 +107,10 @@ function exports.runFile(path, args, env, isolated)
         error("Specified file does not exist", 2)
     end
     
-    local processEnv
-    if isolated then
-        if not env then
-            error("Must provide an environment to run in isolated mode", 2)
-        end
+    local name = fs.getName(path)
+    local process = createProcessObject(name, env, isolated)
 
-        processEnv = env
-    else
-        local rootEnv = createSafeEnvironment()
-        processEnv = setmetatable(env or {}, { __index = rootEnv })
-    end
-
-    local fileMain, err = loadfile(path, nil, processEnv)
+    local fileMain, err = loadfile(path, nil, process.env)
     if not fileMain or err then
         if not err or err == "" then
             err = "loadfile failed with unknown error"
@@ -126,8 +128,7 @@ function exports.runFile(path, args, env, isolated)
         entrypoint = fileMain
     end
 
-    local name = fs.getName(path)
-    return exports.runFunc(name, entrypoint, processEnv, true)
+    return submitProcessObject(process, entrypoint)
 end
 
 function exports.kill(pid, error)
@@ -140,11 +141,13 @@ function exports.kill(pid, error)
     process.error = error
 
     -- Execute cleanup hooks
-    executeHooks(cleanupHooks, pid, process.data)
+    executeHooks(cleanupHooks, process)
 
     processes[pid] = nil
     -- This should be cleaned up, but we have no mechanism for tracking threads
     -- coroutines[process.entrypoint] = nil
+
+    log.info(string.format("Process killed: %d, reason: %s", pid, tostring(error)))
 end
 
 function exports.suspend(pid)
@@ -271,6 +274,7 @@ end
 
 -- Override os.run() with an implementation using the kernel scheduler
 safeOSLib.run = function(tEnv, sPath, ...)
+    log.info("run")
     local parentPID = exports.getCurrentProcessID()
     if parentPID == nil then
         log.warn("Used userspace os.run() call from kernel-space. Or is kernel-space being leaked?")
@@ -280,7 +284,7 @@ safeOSLib.run = function(tEnv, sPath, ...)
         tEnv = setmetatable(tEnv, { __index = parent.env })
     end
     -- Create a process for the file
-    local childProcess = exports.runFile(sPath, {...}, tEnv)
+    local childProcess = exports.runFile(sPath, {...}, tEnv, true)
 
     -- Wait for the process to finish
     while true do
