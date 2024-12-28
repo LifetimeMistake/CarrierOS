@@ -24,6 +24,7 @@ if not log then
         error = function(msg)
             logger:error(msg)
         end,
+        instance = logger
     }
 
     logger:setHook(function (level, message)

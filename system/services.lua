@@ -88,6 +88,7 @@ function exports.start(name)
             error = function(msg)
                 service.logger:error(msg)
             end,
+            instance = service.logger
         }
     }
     
