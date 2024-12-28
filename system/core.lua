@@ -113,7 +113,9 @@ local function boot()
 
     if settings.get("kernel.debug", false) then
         kernel.process.registerCreateHook(function(process)
-            process.env.kernel = kernel
+            if process.privileged then
+                process.env.kernel = kernel
+            end
         end)
     end
 
@@ -134,7 +136,7 @@ local function boot()
         initPath = "/rom/programs/shell.lua"
     end
     
-    kernel.process.runFile(initPath)
+    kernel.process.runFile(initPath, true)
     kernel.process.runScheduler()
 
     printk("Kernel finished. Halt.")

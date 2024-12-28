@@ -47,7 +47,7 @@ local function makeEntrypoint(entrypoint, env)
     end
 end
 
-local function createProcessObject(name, env, isolated)
+local function createProcessObject(name, privileged, env, isolated)
     local processEnv
     if isolated then
         if not env then
@@ -70,6 +70,7 @@ local function createProcessObject(name, env, isolated)
         env = processEnv,
         data = {},
         status = "running",
+        privileged = privileged
     }
 
     executeHooks(createHooks, process)
@@ -86,7 +87,7 @@ local function submitProcessObject(po, entrypoint)
     return po
 end
 
-function exports.runFunc(name, entrypoint, env, isolated)
+function exports.runFunc(name, entrypoint, privileged, env, isolated)
     if #processes >= processLimit then
         error("Process limit reached", 2)
     end
@@ -94,11 +95,11 @@ function exports.runFunc(name, entrypoint, env, isolated)
         error("Entrypoint must be a function", 2)
     end
 
-    local process = createProcessObject(name, env, isolated)
+    local process = createProcessObject(name, privileged, env, isolated)
     return submitProcessObject(process, entrypoint)
 end
 
-function exports.runFile(path, args, env, isolated)
+function exports.runFile(path, args, privileged, env, isolated)
     if type(path) ~= "string" then
         error("Path must be a string", 2)
     end
@@ -108,7 +109,7 @@ function exports.runFile(path, args, env, isolated)
     end
     
     local name = fs.getName(path)
-    local process = createProcessObject(name, env, isolated)
+    local process = createProcessObject(name, privileged, env, isolated)
 
     local fileMain, err = loadfile(path, nil, process.env)
     if not fileMain or err then
@@ -270,6 +271,7 @@ end
 
 -- Override os.run() with an implementation using the kernel scheduler
 safeOSLib.run = function(tEnv, sPath, ...)
+    local privileged = false
     local parentPID = exports.getCurrentProcessID()
     if parentPID == nil then
         log.warn("Used userspace os.run() call from kernel-space. Or is kernel-space being leaked?")
@@ -277,9 +279,10 @@ safeOSLib.run = function(tEnv, sPath, ...)
         -- Share environment with parent
         local parent = exports.getProcessObject(parentPID)
         tEnv = setmetatable(tEnv, { __index = parent.env })
+        privileged = parent.privileged
     end
     -- Create a process for the file
-    local childProcess = exports.runFile(sPath, {...}, tEnv, true)
+    local childProcess = exports.runFile(sPath, {...}, privileged, tEnv, true)
 
     -- Wait for the process to finish
     while true do
