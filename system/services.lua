@@ -75,7 +75,20 @@ function exports.start(name)
                 service.logger:info(v)
             end
         end,  -- Override print with logger.info
-        log = service.logger
+        log = {
+            debug = function(msg)
+                service.logger:debug(msg)
+            end,
+            info = function(msg)
+                service.logger:info(msg)
+            end,
+            warn = function(msg)
+                service.logger:warn(msg)
+            end,
+            error = function(msg)
+                service.logger:error(msg)
+            end,
+        }
     }
     
     -- Merge with user-provided environment
