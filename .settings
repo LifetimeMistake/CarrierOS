@@ -1,0 +1,7 @@
+{
+  [ "bios.use_multishell" ] = false,
+  [ "kernel.debug" ] = true,
+  [ "bios.init_program" ] = "/system/core.lua",
+  [ "kernel.init_program" ] = "/init.lua",
+  [ "kernel.logging.log_level" ] = "DEBUG",
+}
