@@ -205,6 +205,7 @@ local autopilot = autopilot_api.new(
     config.autopilot.arrivalThreshold
 )
 
+local halt = false
 stabilizer:start()
 autopilot:setActive(true)
 
@@ -426,7 +427,14 @@ local api = {
     }
 }
 
+-- Attempt to publish API
 _G.carrieros = api
+do
+    local success, err = pcall(api_factory.publish, "carrieros", api)
+    if not success then
+        log.warn("Failed to publish system-wide CarrierOS API: " .. tostring(err))
+    end
+end
 
 -- Function to handle stabilizer updates
 local now = 0
