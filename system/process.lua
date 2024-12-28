@@ -300,9 +300,112 @@ safeOSLib.run = function(tEnv, sPath, ...)
     end
 end
 
+local function checkPrivileged()
+    local pid = kernel.process.getCurrentProcessID()
+    if not pid then
+        log.error("Used userspace process API from kernel-space. Aborting.")
+        error("Kernel error")
+    end
+    
+    local proc = kernel.process.getProcessObject(pid)
+    if not proc.privileged then
+        error("Permission denied", 3)
+    end
+
+    return proc
+end
+
+
+local processAPI = {}
+
+-- Read-only operations (available to all processes)
+function processAPI.list()
+    local processes = exports.list()
+    local result = {}
+    
+    for pid, proc in pairs(processes) do
+        result[pid] = {
+            pid = proc.pid,
+            name = proc.name,
+            status = proc.status,
+            privileged = proc.privileged
+        }
+    end
+    
+    return result
+end
+
+function processAPI.status(pid)
+    local proc = exports.getProcessObject(pid)
+    return {
+        pid = proc.pid,
+        name = proc.name,
+        status = proc.status,
+        privileged = proc.privileged
+    }
+end
+
+function processAPI.exists(pid)
+    return exports.processExists(pid)
+end
+
+function processAPI.getCurrentPID()
+    return exports.getCurrentProcessID()
+end
+
+-- Process management operations
+function processAPI.kill(pid)
+    local currentPID = exports.getCurrentProcessID()
+    if not pid then
+        log.error("Used userspace protect API from kernel-space. Aborting.")
+        error("Kernel error")
+    end
+    
+    local currentProc = exports.getProcessObject(currentPID)
+    local targetProc = exports.getProcessObject(pid)
+    
+    -- Privileged processes can kill any process
+    -- Unprivileged processes can only kill unprivileged processes
+    if not currentProc.privileged and targetProc.privileged then
+        error("Permission denied", 2)
+    end
+    
+    return exports.kill(pid)
+end
+
+function processAPI.suspend(pid)
+    checkPrivileged()
+    return exports.suspend(pid)
+end
+
+function processAPI.resume(pid)
+    checkPrivileged()
+    return exports.resume(pid)
+end
+
+function processAPI.runFile(path, args, privileged, env, isolated)
+    -- Only privileged processes can spawn privileged children
+    if privileged then
+        checkPrivileged()
+    end
+    local proc = exports.runFile(path, args, privileged, env, isolated)
+    return proc.pid
+end
+
+function processAPI.runFunction(name, func, privileged, env, isolated)
+    -- Only privileged processes can spawn privileged children
+    if privileged then
+        checkPrivileged()
+    end
+    local proc = exports.runFunc(name, func, privileged, env, isolated)
+    return proc.pid
+end
+
+-- Update the create hook to inject our API along with the safe coroutine and OS libraries
 exports.registerCreateHook(function(process)
     process.env.coroutine = safeCoroutineLib
     process.env.os = safeOSLib
+    process.env.process = processAPI
 end)
 
 local function init(kernel)
