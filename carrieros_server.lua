@@ -218,7 +218,7 @@ end
 local api = {
     server = {
         getVersion = function()
-            return "1.0.0"
+            return consts.SERVER_VERSION
         end,
         
         getHostname = function()
@@ -226,7 +226,7 @@ local api = {
         end,
         
         getHostId = function()
-            return tostring(os.getComputerId())
+            return tostring(os.getComputerID())
         end,
         
         getRingBuffer = function(limit, offset)
