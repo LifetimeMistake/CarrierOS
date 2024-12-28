@@ -99,14 +99,11 @@ settings.define("kernel.init_program", {
     type = "string"
 })
 
-local function getPID()
-    return kernel.process.getCurrentProcessID()
-end
-
 local function boot()
     -- Load kernel subsystems
     requireSubsystem("system.logging")
     requireSubsystem("system.process")
+    requireSubsystem("system.peripheral")
 
     printk("Kernel load complete")
     printk("Loaded " .. #kernel.listSubsystems() .. " subsystems")
@@ -129,7 +126,7 @@ local function boot()
     kernel.process.runScheduler()
 
     printk("Kernel finished. Halt.")
-    os.sleep(1)
+    os.sleep(30)
 end
 
 boot()
