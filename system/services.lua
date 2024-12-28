@@ -159,6 +159,77 @@ function exports.list()
     return result
 end
 
+local function checkPrivileged()
+    local pid = kernel.process.getCurrentProcessID()
+    if not pid then return true end -- Kernel space is always privileged
+    
+    local proc = kernel.process.getProcessObject(pid)
+    if not proc.privileged then
+        error("Permission denied", 3)
+    end
+end
+
+local servicesAPI = {}
+-- Read-only operations (available to all processes)
+function servicesAPI.status(name)
+    local status = exports.status(name)
+    -- Don't expose internal logger object to userspace
+    status.logger = nil
+    return status
+end
+
+function servicesAPI.list()
+    local list = exports.list()
+    -- Don't expose internal logger objects to userspace
+    for _, status in pairs(list) do
+        status.logger = nil
+    end
+    return list
+end
+
+function servicesAPI.getLogs(name)
+    local service = services[name]
+    if not service then
+        error("Service not found: " .. name)
+    end
+    
+    local logs = {}
+    for entry in service.logger:iter() do
+        table.insert(logs, {
+            level = logging.LogLevel.tostring(entry.level),
+            message = entry.message,
+            timestamp = entry.timestamp
+        })
+    end
+    return logs
+end
+
+-- Management operations (requires privilege check)
+function servicesAPI.register(name, filepath, options)
+    checkPrivileged()
+    return exports.register(name, filepath, options)
+end
+
+function servicesAPI.unregister(name)
+    checkPrivileged()
+    return exports.unregister(name)
+end
+
+function servicesAPI.start(name)
+    checkPrivileged()
+    return exports.start(name)
+end
+
+function servicesAPI.stop(name)
+    checkPrivileged()
+    return exports.stop(name)
+end
+
+-- Inject API into process environment
+kernel.process.registerCreateHook(function(process)
+    process.env.services = servicesAPI
+end)
+
 -- Handle process exit for all services
 kernel.process.registerExitHook(function(proc)
     for _, service in pairs(services) do
