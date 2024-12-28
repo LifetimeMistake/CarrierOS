@@ -47,15 +47,15 @@ end
 local RPCServer = {}
 RPCServer.__index = RPCServer
 
-function RPCServer:new(modemName, hostname)
-    local instance = setmetatable({}, self)
-    instance.hostname = hostname or ("carrieros_" + tostring(generateRequestId()))
+function RPCServer.new(modemName, hostname)
+    local instance = setmetatable({}, RPCServer)
+    instance.hostname = hostname or ("carrieros_" .. tostring(generateRequestId()))
     instance.modem = modemName
     instance.isRunning = false
     instance.services = {}
 
-    if not rednet.isOpen(self.modem) then
-        rednet.open(self.modem)
+    if not rednet.isOpen(modemName) then
+        rednet.open(modemName)
     end
 
     return instance
@@ -98,13 +98,13 @@ function RPCServer:unregisterService(name)
 end
 
 function RPCServer:handleRequest(request)
-    local requestType = request.type
+    local requestType = request.command
 
     if requestType == "list" then
         local data = {}
         if request.service then
             local service = self.services[request.service]
-            if not service or not service[request.method] then
+            if not service then
                 return responseErr(request, "Object not found")
             end
 
@@ -157,11 +157,12 @@ end
 local RPCClient = {}
 RPCClient.__index = RPCClient
 
-function RPCClient:new(modemName, timeout)
-    local instance = setmetatable({}, self)
+function RPCClient.new(modemName, timeout)
+    local instance = setmetatable({}, RPCClient)
     instance.modem = modemName
     instance.host = nil
     instance.timeout = timeout or 2
+    instance.pendingRequests = {}
 
     if not rednet.isOpen(modemName) then
         rednet.open(modemName)
@@ -278,3 +279,8 @@ function RPCClient:wrapService(serviceName)
 
     return true, proxy
 end
+
+return {
+    RPCServer = RPCServer,
+    RPCClient = RPCClient
+}
