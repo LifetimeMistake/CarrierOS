@@ -84,7 +84,7 @@ function exports.runFunc(name, entrypoint, env, isolated)
 
     processes[pid] = process
     coroutines[wrappedEntrypoint] = pid
-    return pid
+    return process
 end
 
 function exports.runFile(path, args, env, isolated)
@@ -130,12 +130,14 @@ function exports.runFile(path, args, env, isolated)
     return exports.runFunc(name, entrypoint, processEnv, true)
 end
 
-function exports.kill(pid)
+function exports.kill(pid, error)
     local process = processes[pid]
     if not process then
         error("Invalid PID", 2)
     end
+
     process.status = "terminated"
+    process.error = error
 
     -- Execute cleanup hooks
     executeHooks(cleanupHooks, pid, process.data)
@@ -160,22 +162,23 @@ function exports.resume(pid)
     process.status = "running"
 end
 
-function exports.getInformation(pid)
+function exports.getProcessObject(pid)
     local process = processes[pid]
     if not process then
         error("Invalid PID", 2)
     end
-    return {
-        pid = process.pid,
-        name = process.name,
-        status = process.status,
-    }
+    
+    return process
+end
+
+function exports.processExists(pid)
+    return processes[pid] ~= nil
 end
 
 function exports.list()
     local list = {}
     for pid, process in pairs(processes) do
-        table.insert(list, exports.getInformation(pid))
+        table.insert(list, exports.getProcessObject(pid))
     end
     return list
 end
@@ -201,7 +204,7 @@ function exports.runScheduler()
                 if not ok then
                     printError("Error in process " .. pid .. ": " .. tostring(filter))
                     if processes[pid] then
-                        exports.kill(pid)
+                        exports.kill(pid, filter)
                     end
                 else
                     process.filter = filter
@@ -219,11 +222,11 @@ function exports.runScheduler()
     end
 end
 
-function exports.addCleanupHook(hook)
+function exports.registerExitHook(hook)
     table.insert(cleanupHooks, hook)
 end
 
-function exports.addCreateHook(hook)
+function exports.registerCreateHook(hook)
     table.insert(createHooks, hook)
 end
 
@@ -231,5 +234,73 @@ function exports.getCurrentProcessID()
     local co = coroutine.running()
     return coroutines[co] or nil -- Kernel space has no PID
 end
+
+-- Export some modified functions
+-- Wrap the coroutine library to keep track of unmanaged coroutines
+local safeCoroutineCreate = function(f, e)
+    local co = f(e)
+    local pid = exports.getCurrentProcessID()
+    if not pid then
+        log.warn("Used userspace coroutine library from kernel-space. Or is kernel-space being leaked?")
+        return co
+    end
+
+    coroutines[co] = pid
+    return co
+end
+
+local safeCoroutineLib = {
+    create = function(f)
+        return safeCoroutineCreate(coroutine.create, f)
+    end,
+    resume = coroutine.resume,
+    running = coroutine.running,
+    status = coroutine.status,
+    wrap = function(f)
+        return safeCoroutineCreate(coroutine.wrap, f)
+    end,
+    yield = coroutine.yield
+}
+
+-- Wrap os library
+local safeOSLib = {}
+for k,v in pairs(os) do
+    safeOSLib[k] = v
+end
+
+-- Override os.run() with an implementation using the kernel scheduler
+safeOSLib.run = function(tEnv, sPath, ...)
+    local parentPID = exports.getCurrentProcessID()
+    if parentPID == nil then
+        log.warn("Used userspace os.run() call from kernel-space. Or is kernel-space being leaked?")
+    else
+        -- Share environment with parent
+        local parent = exports.getProcessObject(parentPID)
+        tEnv = setmetatable(tEnv, { __index = parent.env })
+    end
+    -- Create a process for the file
+    local childProcess = exports.runFile(sPath, {...}, tEnv)
+
+    -- Wait for the process to finish
+    while true do
+        if childProcess.status == "terminated" then
+            if childProcess.error then
+                if childProcess.error ~= "" then
+                    printError(tostring(childProcess.error))
+                end
+                return false
+            end
+
+            return true
+        end
+
+        coroutine.yield()
+    end
+end
+
+exports.registerCreateHook(function(process)
+    process.env.coroutine = safeCoroutineLib
+    process.env.os = safeOSLib
+end)
 
 return ko.subsystem("process", exports)
