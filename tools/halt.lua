@@ -1,8 +1,16 @@
 local thrust_api = require("libs.thrusters")
 local serialization = require("libs.serialization")
+local consts = require("components.consts")
 
-local function getEngineAPI()
-    local status, data = serialization.native.loadf("engine_config.txt")
+print("HALTING THRUSTERS")
+if carrieros then
+    -- The CarrierOS server exposes a global API through the kernel
+    carrieros.debug.halt()
+    return
+end
+
+local function getThrusterAPI()
+    local status, data = serialization.json.loadf(consts.THRUSTER_CONFIG_PATH)
     if not status then
         error("Failed to load engine map: " .. data)
     end
@@ -15,9 +23,7 @@ local function getEngineAPI()
     return data
 end
 
-local api = getEngineAPI()
-
-print("HALTING THRUSTERS")
+local api = getThrusterAPI()
 for name, engine in pairs(api.thrusters) do
     engine.setManaged(false)
     engine.setLevel(0)
