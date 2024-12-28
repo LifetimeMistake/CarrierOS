@@ -1,31 +1,16 @@
 -- Engine configuration script
 local thrust_api = require("libs.thrusters")
 local serialization = require("libs.serialization")
-
--- Define engine names
-local engines = {
-    "main_front_left",
-    "main_front_right",
-    "main_back_left",
-    "main_back_right",
-    "thrust_left",
-    "thrust_right",
-    "corr_front_left",
-    "corr_front_right",
-    "corr_back_left",
-    "corr_back_right"
-}
-
-local CONFIG_FILE = "engine_config.txt"
+local consts = require("components.consts")
 
 local function loadConfig()
-    if not fs.exists(CONFIG_FILE) then
+    if not fs.exists(consts.THRUSTER_CONFIG_PATH) then
         return nil
     end
     
-    local status, data = serialization.native.loadf(CONFIG_FILE)
+    local status, data = serialization.json.loadf(consts.THRUSTER_CONFIG_PATH)
     if not status then
-        error("Failed to read engine config: " .. data)
+        error("Failed to read thruster config: " .. data)
     end
 
     return data
@@ -74,17 +59,17 @@ end
 -- Reset all integrators before starting configuration
 resetIntegrators(integrators)
 
-local engineMap = loadConfig()
-if engineMap then
+local thrusterMap = loadConfig()
+if thrusterMap then
     print("Loaded configuration from file.")
-    local allConnected = thrust_api.validateEngineMap(engineMap)
+    local allConnected = thrust_api.validateEngineMap(thrusterMap)
     if allConnected then
         print("All integrators are connected. Configuration is valid.")
     else
         print("Some integrators are missing.")
-        for engine, config in pairs(engineMap) do
+        for engine, config in pairs(thrusterMap) do
             if not peripheral.isPresent(config.integrator) then
-                print("Error: Integrator for engine " .. engine .. " is not connected.")
+                print("Error: Integrator for thruster " .. engine .. " is not connected.")
             end
         end
     end
@@ -103,10 +88,10 @@ if engineMap then
 end
 
 -- Map to store engine-to-integrator mapping
-engineMap = {}
+thrusterMap = {}
 
 -- Configuration process
-for _, engine in ipairs(engines) do
+for _, engine in ipairs(consts.THRUSTER_NAMES) do
     print("Please configure thruster " .. engine .. "...")
 
     local detectedIntegrator = nil
@@ -166,7 +151,7 @@ for _, engine in ipairs(engines) do
         end
     end
 
-    engineMap[engine] = {
+    thrusterMap[engine] = {
         type = type,
         integrator = detectedIntegrator,
         powerSide = powerSide,
@@ -183,15 +168,15 @@ for _, engine in ipairs(engines) do
 end
 
 -- Save the final mapping
-serialization.native.dumpf(engineMap, CONFIG_FILE)
+serialization.json.dumpf(thrusterMap, consts.THRUSTER_CONFIG_PATH)
 
 -- Output the final mapping
 do
-    print("\nConfiguration complete! Engine map:")
-    for engine, config in pairs(engineMap) do
+    print("\nConfiguration complete! Thruster map:")
+    for thruster, config in pairs(thrusterMap) do
         print(
-            string.format("%s -> T: %s, Ig: %s, Ps: %s, Ts: %s, Ds: %s, V: {%d, %d, %d}, Dn: %d", 
-            engine, 
+            string.format("%s -> T: %s, Ig: %s, Ps: %s, Ts: %s, Ds: %s, V: {%d, %d, %d}, Dn: %s", 
+            thruster, 
             config.type,
             config.integrator, 
             config.powerSide, 
