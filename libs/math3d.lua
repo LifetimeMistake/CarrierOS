@@ -12,6 +12,10 @@ function Vector3.from_table(t)
     return Vector3.new(t.x, t.y, t.z)
 end
 
+function Vector3.to_table(v)
+    return {x = v.x, y = v.y, z = v.z}
+end
+
 function Vector3.__add(v1, v2)
     return Vector3.new(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z)
 end
