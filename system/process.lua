@@ -143,7 +143,8 @@ function exports.kill(pid, error)
     executeHooks(cleanupHooks, pid, process.data)
 
     processes[pid] = nil
-    coroutines[process.entrypoint] = nil
+    -- This should be cleaned up, but we have no mechanism for tracking threads
+    -- coroutines[process.entrypoint] = nil
 end
 
 function exports.suspend(pid)
