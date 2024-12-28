@@ -43,6 +43,8 @@ end
 local function makeEntrypoint(entrypoint, env)
     return function(...)
         setfenv(entrypoint, env)
+        local make_package = dofile("/rom/modules/main/cc/require.lua").make
+        env.require, env.package = make_package(env, "/")
         return entrypoint(...)
     end
 end
