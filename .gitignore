@@ -1,3 +1,4 @@
 data/persist.json
 data/system_config.json
 data/thruster_config.json
+data/waypoint_db.json

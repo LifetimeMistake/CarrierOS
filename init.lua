@@ -22,4 +22,4 @@ services.register(
 services.start("carrieros_server")
 term.clear()
 term.setCursorPos(0, 0)
-process.runFile(sShell, nil, false)
+process.runFile(sShell, nil, true)

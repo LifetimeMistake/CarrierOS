@@ -136,17 +136,6 @@ function stabilizer:doOrientationStep()
     local pitch, yaw, roll = ship.getOrientation()
     local weights = computeWeights(pitch, roll, self.pitchPID, self.rollPID)
 
-    -- print(
-    --     string.format("Current orientation: (%f, %f, %f)",
-    --     pitch,
-    --     yaw,
-    --     roll
-    -- ))
-
-    -- print(string.format("New weight matrix: [%f, %f, %f, %f]",
-    --     table.unpack(weights)
-    -- ))
-
     weightMap[thrusterMap.main.FL] = weights[1]
     weightMap[thrusterMap.main.FR] = weights[2]
     weightMap[thrusterMap.main.BL] = weights[3]
@@ -230,40 +219,11 @@ function stabilizer:doThrustStep()
     local reqAccel = self.targetVector - (vel + ship.worldToLocal(WORLD_GRAVITY))
     local reqForce = Vector3.componentWiseMultiply(reqAccel * mass, self.K)
 
-    -- print(
-    --     string.format("Required force: (%s, %s, %s)", 
-    --     utils.formatForce(reqForce.x),
-    --     utils.formatForce(reqForce.y),
-    --     utils.formatForce(reqForce.z)
-    -- ))
-
-    local forceDiff = Vector3.new(
+    self.forceDiff = Vector3.new(
         self:solveComponent(vel, pos.y, reqForce, "x"),
         self:solveComponent(vel, pos.y, reqForce, "y"),
         self:solveComponent(vel, pos.y, reqForce, "z")
     )
-
-    -- print("Force diff: " .. utils.formatForce(forceDiff:magnitude()))
-    -- print(
-    --     string.format("reqAccel: (%f, %f, %f)",
-    --     reqAccel.x,
-    --     reqAccel.y,
-    --     reqAccel.z
-    -- ))
-
-    -- print(
-    --     string.format("Current velocity: (%f, %f, %f)",
-    --     vel.x,
-    --     vel.y,
-    --     vel.z
-    -- ))
-
-    -- print(
-    --     string.format("K: (%f, %f, %f)",
-    --     self.K.x,
-    --     self.K.y,
-    --     self.K.z
-    -- ))
 end
 
 function stabilizer:setTarget(pos, heading)

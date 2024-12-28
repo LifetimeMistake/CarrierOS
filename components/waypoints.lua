@@ -6,7 +6,7 @@ local function loadDB(databasePath, loadExisting)
     if loadExisting and fs.exists(databasePath) then
         local success, data = serialization.json.loadf(databasePath)
         if not success then
-            print("Error loading database, falling back to empty DB")
+            log.error("Error loading database, falling back to empty DB")
             fs.move(databasePath, databasePath .. ".bak")
         end
 
@@ -41,7 +41,7 @@ end
 function Waypoints:save()
     local success, message = serialization.json.dumpf(self.db, self.dbPath)
     if not success then
-        print("Failed to save database: " .. message)
+        log.warn("Failed to save database: " .. message)
     end
 end
 
@@ -49,7 +49,7 @@ function Waypoints:add(name, pos, heading)
     local id = findNextFreeId(self.db)
     self.db[id] = {
         name = name,
-        pos = pos,
+        pos = Vector3.to_table(pos),
         heading = heading
     }
 end
@@ -68,6 +68,10 @@ function Waypoints:update(id, data)
         return false
     end
 
+    if data.pos then
+        data.pos = Vector3.to_table(data.pos)
+    end
+
     for k,v in pairs(data) do
         waypoint[k] = v
     end
@@ -83,16 +87,18 @@ function Waypoints:get(id)
 
     return {
         name = waypoint.name,
-        pos = waypoint.pos,
+        pos = Vector3.from_table(waypoint.pos),
         heading = waypoint.heading
     }
 end
 
 function Waypoints:list()
     local t = {}
-    for k,v in pairs(self.db) do
-        t[k] = v
+    for k,_ in pairs(self.db) do
+        t[k] = self:get(k)
     end
 
     return t
 end
+
+return Waypoints
