@@ -99,11 +99,23 @@ settings.define("kernel.init_program", {
     type = "string"
 })
 
+settings.define("kernel.debug", {
+    default = false,
+    description = "[[Exposes the kernel interface to userspace if enabled.]]",
+    type = "boolean"
+})
+
 local function boot()
     -- Load kernel subsystems
     requireSubsystem("system.logging")
     requireSubsystem("system.process")
     requireSubsystem("system.peripheral")
+
+    if settings.get("kernel.debug", false) then
+        kernel.process.registerCreateHook(function(process)
+            process.env.kernel = kernel
+        end)
+    end
 
     printk("Kernel load complete")
     printk("Loaded " .. #kernel.listSubsystems() .. " subsystems")
