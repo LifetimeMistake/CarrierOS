@@ -275,7 +275,7 @@ kernel.process.registerExitHook(function(proc)
             if proc.error then
                 service.status = SERVICE_STATUS.FAILED
                 service.failureCount = service.failureCount + 1
-                service.logger:error("Service failed:", tostring(proc.error))
+                service.logger:error("Service failed:" .. proc.error)
                 log.error(string.format("Service %s failed: %s", service.name, tostring(proc.error)))
             else
                 log.info(string.format("Service %s exited normally", service.name))
@@ -286,7 +286,7 @@ kernel.process.registerExitHook(function(proc)
                (service.restartPolicy.type == "on-failure" and 
                 proc.error and 
                 service.failureCount <= service.restartPolicy.limit) then
-                service.logger:info("Restarting service due to policy:", service.restartPolicy.type)
+                service.logger:info("Restarting service due to policy: " .. service.restartPolicy.type)
                 exports.start(service.name)
             end
             break

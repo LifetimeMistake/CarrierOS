@@ -213,9 +213,9 @@ local function processSchedulerThread(eventData)
             if process.status == "running" and coroutine.status(process.entrypoint) ~= "dead" then
                 local ok, filter = coroutine.resume(process.entrypoint, table.unpack(eventData, 1, eventData.n))
                 if not ok then
-                    printError("Error in process " .. pid .. ": " .. tostring(filter))
+                    log.error("Error in process " .. pid .. ": " .. tostring(filter))
                     if processes[pid] then
-                        exports.kill(pid, filter)
+                        exports.kill(pid, tostring(filter))
                     end
                 else
                     process.filter = filter
@@ -299,7 +299,7 @@ safeOSLib.run = function(tEnv, sPath, ...)
         if childProcess.status == "terminated" then
             if childProcess.error then
                 if childProcess.error ~= "" then
-                    printError(tostring(childProcess.error))
+                    log.error(tostring(childProcess.error))
                 end
                 return false
             end
