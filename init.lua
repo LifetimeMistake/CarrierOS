@@ -12,7 +12,7 @@ end
 
 services.register(
     "carrieros_server", 
-    "/carrieros.lua",
+    "/carrieros_server.lua",
     {
         restartPolicy = "on-failure:5",
         loggerCapacity = 100,
@@ -20,7 +20,19 @@ services.register(
     }
 )
 
+services.register(
+    "carrieros_rpc", 
+    "/carrieros_rpc.lua",
+    {
+        restartPolicy = "on-failure:5",
+        loggerCapacity = 100,
+        privileged = false
+    }
+)
+
 services.start("carrieros_server")
+services.start("carrieros_rpc")
+
 term.clear()
 term.setCursorPos(0, 0)
 process.runFile(sShell, nil, false)
