@@ -81,16 +81,12 @@ local function hasAccess(type, peripheral)
     end
 
     local pid = kernel.process.getCurrentProcessID()
-    if pid == nil then
-        log.warn("Used userspace peripheral API from kernel-space. Or is kernel-space being leaked?")
+    if not pid then
+        log.error("Used userspace protect API from kernel-space. Aborting.")
+        error("Kernel error")
     end
 
     local process = kernel.process.getProcessObject(pid)
-    if not process then
-        log.error("[peripheral] Failed to fetch process object")
-        return false
-    end
-
     local isOwner = process.data.protectedPeripherals[peripheral] or false
     return isOwner or (type == "read" and not protect.protectRead) or (type == "write" and not protect.protectWrite)
 end
@@ -210,11 +206,6 @@ function safePeripheralLib.unprotect(name)
     end
 
     local process = kernel.process.getProcessObject(pid)
-    if not process then
-        log.error("[peripheral] Failed to fetch process object")
-        error("Kernel error")
-    end
-
     local isOwner = process.data.protectedPeripherals[name] or false
     if protected[name] and not isOwner then
         error("Permission denied", 2)

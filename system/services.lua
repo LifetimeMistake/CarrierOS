@@ -161,7 +161,10 @@ end
 
 local function checkPrivileged()
     local pid = kernel.process.getCurrentProcessID()
-    if not pid then return true end -- Kernel space is always privileged
+    if not pid then
+        log.error("Used userspace services API from kernel-space. Aborting.")
+        error("Kernel error")
+    end
     
     local proc = kernel.process.getProcessObject(pid)
     if not proc.privileged then
