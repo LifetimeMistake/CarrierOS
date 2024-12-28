@@ -180,11 +180,7 @@ function exports.processExists(pid)
 end
 
 function exports.list()
-    local list = {}
-    for pid, process in pairs(processes) do
-        table.insert(list, exports.getProcessObject(pid))
-    end
-    return list
+    return processes
 end
 
 function exports.runScheduler()
@@ -274,7 +270,6 @@ end
 
 -- Override os.run() with an implementation using the kernel scheduler
 safeOSLib.run = function(tEnv, sPath, ...)
-    log.info("run")
     local parentPID = exports.getCurrentProcessID()
     if parentPID == nil then
         log.warn("Used userspace os.run() call from kernel-space. Or is kernel-space being leaked?")
