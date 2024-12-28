@@ -1,4 +1,5 @@
 local math3d = require("libs.math3d")
+local utils = require("libs.utils")
 local Vector3 = math3d.Vector3
 local ZERO_VECTOR = Vector3.new(0, 0, 0)
 
@@ -38,15 +39,19 @@ function HoldStrategy:new()
     local obj = Strategy:new()
     setmetatable(obj, self)
     obj.holdPosition = nil
+    obj.holdHeading = nil  -- Store the heading we want to maintain
     return obj
 end
 
 function HoldStrategy:onLoad(autopilot)
     self.holdPosition = ship.getWorldspacePosition()
+    local _, yaw, _ = ship.getOrientation()
+    self.holdHeading = math.deg(yaw) -- Convert to degrees for storage
 end
 
 function HoldStrategy:onUnload(autopilot)
     self.holdPosition = nil
+    self.holdHeading = nil
 end
 
 function HoldStrategy:update(autopilot)
@@ -58,18 +63,30 @@ function HoldStrategy:update(autopilot)
     local direction = self.holdPosition - currentPosition
     local distance = direction:magnitude()
 
+    -- Calculate rotation needed to maintain stored heading
+    local _, currentYaw, _ = ship.getOrientation()
+    local currentYawDeg = math.deg(currentYaw)
+    local headingError = self.holdHeading - currentYawDeg
+    
+    -- Normalize the error to [-180, 180]
+    while headingError > 180 do headingError = headingError - 360 end
+    while headingError < -180 do headingError = headingError + 360 end
+    
+    -- Convert error to rotation speed (positive = rotate left, negative = rotate right)
+    local rotationSpeed = utils.clamp(headingError, -autopilot.rotationSpeedLimit, autopilot.rotationSpeedLimit)
+
+    -- Set movement and rotation
     if distance < autopilot.arrivalThreshold then
-        autopilot.stabilizer:setTarget(ZERO_VECTOR)
+        autopilot.stabilizer:setTarget(ZERO_VECTOR, rotationSpeed)
         return
     end
 
     local targetVelocity = ship.worldToLocal(direction:normalize() * autopilot.speedLimit)
-
     if distance < autopilot.slowdownThreshold then
         targetVelocity = targetVelocity * (distance / autopilot.slowdownThreshold)
     end
 
-    autopilot.stabilizer:setTarget(targetVelocity)
+    autopilot.stabilizer:setTarget(targetVelocity, rotationSpeed)
 end
 
 function HoldStrategy:getTargetPosition()
@@ -114,13 +131,39 @@ function NavigateStrategy:update(autopilot)
         return
     end
 
-    local targetVelocity = ship.worldToLocal(direction:normalize() * autopilot.speedLimit)
+    -- Calculate current heading and target heading
+    local _, currentYaw, _ = ship.getOrientation()
+    local currentYawDeg = math.deg(currentYaw)
+    
+    -- Calculate the direction to the target
+    local worldDirection = direction:normalize()
+    local targetHeading = math.deg(math.atan2(worldDirection.x, worldDirection.z))
+    
+    -- Determine desired heading based on distance
+    local desiredHeading
+    if distance < autopilot.slowdownThreshold and self.currentWaypoint.heading ~= nil then
+        desiredHeading = self.currentWaypoint.heading
+    else
+        desiredHeading = targetHeading
+    end
+    
+    -- Calculate heading error
+    local headingError = desiredHeading - currentYawDeg
+    
+    -- Normalize the error to [-180, 180]
+    while headingError > 180 do headingError = headingError - 360 end
+    while headingError < -180 do headingError = headingError + 360 end
+    
+    -- Convert error to rotation speed (positive = rotate left, negative = rotate right)
+    local rotationSpeed = utils.clamp(headingError, -autopilot.rotationSpeedLimit, autopilot.rotationSpeedLimit)
 
+    -- Set velocity and rotation
+    local targetVelocity = ship.worldToLocal(direction:normalize() * autopilot.speedLimit)
     if distance < autopilot.slowdownThreshold then
         targetVelocity = targetVelocity * (distance / autopilot.slowdownThreshold)
     end
 
-    autopilot.stabilizer:setTarget(targetVelocity)
+    autopilot.stabilizer:setTarget(targetVelocity, rotationSpeed)
 end
 
 function NavigateStrategy:getTargetPosition()
@@ -131,12 +174,13 @@ end
 local Autopilot = {}
 Autopilot.__index = Autopilot
 
-function Autopilot.new(stabilizer, speedLimit, slowdownThreshold, arrivalThreshold)
+function Autopilot.new(stabilizer, speedLimit, rotationSpeedLimit, slowdownThreshold, arrivalThreshold)
     local obj = setmetatable({}, Autopilot)
     obj.stabilizer = stabilizer
     obj.active = false
     obj.navigationActive = false
     obj.speedLimit = speedLimit or 10
+    obj.rotationSpeedLimit = rotationSpeedLimit or 30
     obj.slowdownThreshold = slowdownThreshold or 40
     obj.arrivalThreshold = arrivalThreshold or 5
     obj.strategyType = nil

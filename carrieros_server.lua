@@ -205,6 +205,7 @@ local stabilizer = stabilizer_api.new(tapi, config)
 local autopilot = autopilot_api.new(
     stabilizer,
     config.autopilot.speedLimit,
+    config.autopilot.rotationSpeedLimit,
     config.autopilot.slowdownThreshold,
     config.autopilot.arrivalThreshold
 )
@@ -365,17 +366,19 @@ local api = {
     
     rc = {
         getFlightVector = function()
-            return Vector3.to_table(autopilot.stabilizer.targetVector)
+            local t = Vector3.to_table(stabilizer.targetVector)
+            t.r = stabilizer.targetHeading
+            return t
         end,
         
-        setFlightVector = function(pos)
+        setFlightVector = function(pos, heading)
             if autopilot:isActive() then
                 return false, "Autopilot is enabled"
             end
             if type(pos) == "table" then
                 pos = Vector3.from_table(pos)
             end
-            autopilot.stabilizer:setTarget(pos)
+            autopilot.stabilizer:setTarget(pos, heading)
             return true
         end
     },
