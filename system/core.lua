@@ -51,8 +51,6 @@ do
     requireEnv = setmetatable(requireEnv, { __index = _ENV })
     require = requireEnv.require
 end
-local expect = require("cc.expect").expect
-local exception = require "cc.internal.exception"
 
 function kernel.loadSubsystem(name, api, load_func)
     if kernel.subsystems[name] then
@@ -164,6 +162,20 @@ local function boot()
         end)
     end
 
+    kernel.process.registerCreateHook(function(process)
+        process.env.getKernelLog = function()
+            local logs = {}
+            for entry in kernel.logging.iterBuffer() do
+                table.insert(logs, {
+                    level = kernel.logging.LogLevel.tostring(entry.level),
+                    message = entry.message,
+                    timestamp = entry.timestamp
+                })
+            end
+            return logs
+        end
+    end)
+
     printk("Kernel load complete")
     printk("Loaded " .. #kernel.listSubsystems() .. " subsystems")
 
@@ -171,6 +183,9 @@ local function boot()
     settings.set("bios.use_multishell", false)
     
     printk("Transferring control to init process")
+    -- Disable kernel logging to stdout
+    kernel.logging.setHook(nil)
+    -- Find init program
     local uInit = settings.get("kernel.init_program", "")
     local initPath
     if uInit ~= "" and fs.exists(uInit) and not fs.isDir(uInit) then
@@ -186,6 +201,10 @@ local function boot()
     kernel.runKernelScheduler()
 
     printk("Kernel finished. Halt.")
+    for entry in kernel.logging.iterBuffer() do
+        local level = kernel.logging.LogLevel.tostring(entry.level)
+        print(string.format("[%s][%s] %s", entry.timestamp, level, entry.message))
+    end
     os.sleep(10)
 end
 

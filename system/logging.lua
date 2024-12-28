@@ -60,8 +60,12 @@ local exports = {
         logLevel = levelNum
     end,
     setHook = function(hook_func)
-        instance:setHook(wrapLogHook(hook_func))
-    end
+        if hook_func then
+            hook_func = wrapLogHook(hook_func)
+        end
+        instance:setHook(hook_func)
+    end,
+    LogLevel = LogLevel
 }
 
 _G.printk = function (...)
