@@ -101,11 +101,16 @@ function stabilizer.new(thrusterAPI, config)
     stabilizer.tickId = 1
     stabilizer.isRunning = false
     stabilizer.specialThrusterMap = config.specialThrusterMap or {}
+    stabilizer.rotReservedThrusters = {}
     stabilizer.weights = {}
 
     stabilizer.pitchPID = PID:new(config.pitchPID.kp, config.pitchPID.ki, config.pitchPID.kd, 0.05 * stabilizer.idleTicks)
     stabilizer.rollPID = PID:new(config.rollPID.kp, config.rollPID.ki, config.rollPID.kd, 0.05 * stabilizer.idleTicks)
 
+    stabilizer.lastYaw = 0
+    stabilizer.yawVelocity = 0
+    stabilizer.smallAngVelocity = config.smallAngVelocity or 5
+    
     return stabilizer
 end
 
@@ -124,7 +129,7 @@ function stabilizer:halt()
     stopThrusters(self.tapi, true)
 end
 
-function stabilizer:doOrientationStep()
+function stabilizer:doTiltStep()
     local thrusterMap = self.specialThrusterMap
 
     if not thrusterMap.main then
@@ -154,12 +159,13 @@ function stabilizer:solveComponent(vel, height, reqForce, component)
     local matchingThrusters = {}
     local matchingThrusterCount = 0
     for _, tWrapper in pairs(self.thrusters) do
+        local name = tWrapper.name
         local thruster = tWrapper.value
         local thrustVector = thruster.getNormalThrustVector()
         local normalMatch = thrustVector == wantedVector
         local inverseMatch = -thrustVector == wantedVector
 
-        if normalMatch or inverseMatch then
+        if normalMatch or inverseMatch and not self.rotReservedThrusters[name] then
             if normalMatch or thruster.supportsDirectionControl() then
                 matchingThrusterCount = matchingThrusterCount + 1
             end
@@ -170,6 +176,11 @@ function stabilizer:solveComponent(vel, height, reqForce, component)
     local submittedForce = 0
     local submittedCount = 0
     reqForce = math.abs(reqForce)
+
+    -- Avoid updating K
+    if matchingThrusterCount == 0 then
+        return reqForce
+    end
 
     for _, tWrapper in pairs(matchingThrusters) do
         local name = tWrapper.name
@@ -211,6 +222,134 @@ function stabilizer:solveComponent(vel, height, reqForce, component)
     return reqForce - submittedForce
 end
 
+function stabilizer:calculateYawVelocity()
+    local _, yaw, _ = ship.getOrientation()
+    yaw = math.deg(yaw)
+    local deltaTime = 0.05 * self.idleTicks  -- Time between measurements in seconds
+    
+    -- Calculate yaw delta in degrees and handle wraparound
+    local yawDelta = yaw - self.lastYaw
+    if yawDelta > 180 then
+        yawDelta = yawDelta - 360
+    elseif yawDelta < -180 then
+        yawDelta = yawDelta + 360
+    end
+    
+    -- Calculate angular velocity in degrees per second
+    self.yawVelocity = yawDelta / deltaTime
+    
+    -- Update last yaw value
+    self.lastYaw = yaw
+    
+    return self.yawVelocity
+end
+
+function stabilizer:doRotationStep()
+    local yawVelocity = self:calculateYawVelocity()
+    local rotLarge = self.specialThrusterMap.rotLarge
+    local rotSmall = self.specialThrusterMap.rotSmall
+
+    if not rotSmall and not rotLarge then
+        return
+    end
+
+    -- Calculate error (positive means need to turn left, negative means right)
+    local velocityError = self.targetHeading - yawVelocity
+    
+    -- Clear previous reserved thrusters
+    for name, _ in pairs(self.rotReservedThrusters) do
+        self.rotReservedThrusters[name] = nil
+    end
+
+    local thrustLevel = math.abs(velocityError) / 90.0  -- Scale based on error magnitude
+    thrustLevel = utils.clamp(thrustLevel, 0.0, 1.0)
+    
+    if rotLarge and (math.abs(self.targetHeading) > self.smallAngVelocity or not rotSmall) then
+        print("AV: " .. yawVelocity .. ", VE: " .. velocityError, ", TV: " .. self.targetHeading, ", TYPE: LARGE")
+        -- Handle using large thrusters
+        self.rotReservedThrusters[rotLarge.LEFT] = true
+        self.rotReservedThrusters[rotLarge.RIGHT] = true
+
+        local left, right = self.tapi.thrusters[rotLarge.LEFT], self.tapi.thrusters[rotLarge.RIGHT]
+        local directionSupported = left.supportsDirectionControl() and right.supportsDirectionControl()
+        if velocityError > 0 then
+            -- Turn left
+            if directionSupported then
+                left.setDirection("reversed")
+                left.setLevel(thrustLevel)
+            else
+                left.setLevel(0)
+            end
+
+            right.setDirection("normal")
+            right.setLevel(thrustLevel)
+        else
+            -- Turn right
+            if directionSupported then
+                right.setDirection("reversed")
+                right.setLevel(thrustLevel)
+            else
+                right.setLevel(0)
+            end
+
+            left.setDirection("normal")
+            left.setLevel(thrustLevel)
+        end
+        
+        return
+    end
+
+    print("AV: " .. yawVelocity .. ", VE: " .. velocityError, ", TV: " .. self.targetHeading, ", TYPE: SMALL")
+
+    -- Else handle with small thrusters
+    self.rotReservedThrusters[rotSmall.FL] = true
+    self.rotReservedThrusters[rotSmall.BR] = true
+    self.rotReservedThrusters[rotSmall.FR] = true
+    self.rotReservedThrusters[rotSmall.BL] = true
+
+    local tFL = self.tapi.thrusters[rotSmall.FL]
+    local tBR = self.tapi.thrusters[rotSmall.BR]
+    local tFR = self.tapi.thrusters[rotSmall.FR]
+    local tBL = self.tapi.thrusters[rotSmall.BL]
+
+    local directionSupported = tFL.supportsDirectionControl() and tBR.supportsDirectionControl()
+    and tFR.supportsDirectionControl() and tBL.supportsDirectionControl()
+    
+    if velocityError > 0 then
+        -- Turn left
+        if directionSupported then
+            tFR.setDirection("reversed")
+            tBL.setDirection("reversed")
+            tFR.setLevel(thrustLevel)
+            tBL.setLevel(thrustLevel)
+        else
+            tFR.setLevel(0)
+            tBL.setLevel(0)
+        end
+
+        tFL.setDirection("normal")
+        tBR.setDirection("normal")
+        tFL.setLevel(thrustLevel)
+        tBR.setLevel(thrustLevel)
+    else
+        -- Turn right
+        if directionSupported then
+            tFL.setDirection("reversed")
+            tBR.setDirection("reversed")
+            tFL.setLevel(thrustLevel)
+            tBR.setLevel(thrustLevel)
+        else
+            tFL.setLevel(0)
+            tBR.setLevel(0)
+        end
+
+        tFR.setDirection("normal")
+        tBL.setDirection("normal")
+        tFR.setLevel(thrustLevel)
+        tBL.setLevel(thrustLevel)
+    end
+end
+
 function stabilizer:doThrustStep()
     local mass = ship.getMass()
     local pos = ship.getWorldspacePosition()
@@ -232,7 +371,8 @@ function stabilizer:setTarget(pos, heading)
 end
 
 function stabilizer:doStep()
-    self:doOrientationStep()
+    self:doTiltStep()
+    self:doRotationStep()
     self:doThrustStep()
 end
 

@@ -71,9 +71,14 @@ function HoldStrategy:update(autopilot)
     -- Normalize the error to [-180, 180]
     while headingError > 180 do headingError = headingError - 360 end
     while headingError < -180 do headingError = headingError + 360 end
-    
+
+    if math.abs(headingError) < 5 then
+        headingError = 0
+    end
+
+    local speedLimit = distance > 100 and autopilot.rotationSpeedLimit or autopilot.stabilizer.smallAngVelocity
     -- Convert error to rotation speed (positive = rotate left, negative = rotate right)
-    local rotationSpeed = utils.clamp(headingError, -autopilot.rotationSpeedLimit, autopilot.rotationSpeedLimit)
+    local rotationSpeed = utils.clamp(headingError, -speedLimit, speedLimit)
 
     -- Set movement and rotation
     if distance < autopilot.arrivalThreshold then
@@ -153,9 +158,14 @@ function NavigateStrategy:update(autopilot)
     -- Normalize the error to [-180, 180]
     while headingError > 180 do headingError = headingError - 360 end
     while headingError < -180 do headingError = headingError + 360 end
-    
+
+    if math.abs(headingError) < 5 then
+        headingError = 0
+    end
+
+    local speedLimit = distance > 100 and autopilot.rotationSpeedLimit or autopilot.stabilizer.smallAngVelocity
     -- Convert error to rotation speed (positive = rotate left, negative = rotate right)
-    local rotationSpeed = utils.clamp(headingError, -autopilot.rotationSpeedLimit, autopilot.rotationSpeedLimit)
+    local rotationSpeed = utils.clamp(headingError, -speedLimit, speedLimit)
 
     -- Set velocity and rotation
     local targetVelocity = ship.worldToLocal(direction:normalize() * autopilot.speedLimit)
