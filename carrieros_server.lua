@@ -86,8 +86,8 @@ end
 
 local function loadSystemConfig()
     local defaults = {
-        tickRate = 1,
-        thrusterWindupTicks = 3,
+        tickRate = 4,
+        thrusterWindupTicks = 5,
         autopilot = {
             speedLimit = 20,
             slowdownThreshold = 80,
@@ -103,6 +103,11 @@ local function loadSystemConfig()
             kp = 1.25,
             ki = 0.25,
             kd = 0.1
+        },
+        yawPID = {
+            kp = 0.5,
+            ki = 0.1,
+            kd = 0.05
         },
         specialThrusterMap = {
             main = {

@@ -2,9 +2,9 @@
     "autopilot": {
         "arrivalThreshold": 2.5,
         "slowdownThreshold": 80,
-        "speedLimit": 20
+        "speedLimit": 10
     },
-    "thrusterWindupTicks": 3,
+    "thrusterWindupTicks": 5,
     "DELTA_K": 0.0075,
     "specialThrusterMap": {
         "main": {
@@ -14,10 +14,14 @@
             "FL": "main_front_left"
         },
         "rotSmall": {
-            "BR": "corr_back_left",
+            "BR": "corr_back_right",
             "BL": "corr_back_left",
             "FR": "corr_front_right",
             "FL": "corr_front_left"
+        },
+        "rotLarge": {
+            "LEFT": "thrust_left",
+            "RIGHT": "thrust_right"
         }
     },
     "pitchPID": {
@@ -33,6 +37,16 @@
         "kd": 0.1,
         "mi": 5.0,
         "id": 0.975
+    },
+    "yawPID": {
+        "kp": 0.1,
+        "ki": 0.05,
+        "kd": 0.01
+    },
+    "yawVelPID": {
+        "kp": 0.1,
+        "ki": 0.05,
+        "kd": 0.01
     },
     "tickRate": 1
 }

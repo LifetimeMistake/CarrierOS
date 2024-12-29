@@ -100,16 +100,18 @@ function stabilizer.new(thrusterAPI, config)
     stabilizer.idleTicks = utils.clamp(math.floor(20 / (config.tickRate or 20)), 1, 19)
     stabilizer.tickId = 1
     stabilizer.isRunning = false
+
     stabilizer.specialThrusterMap = config.specialThrusterMap or {}
     stabilizer.rotReservedThrusters = {}
     stabilizer.weights = {}
 
     stabilizer.pitchPID = PID:new(config.pitchPID.kp, config.pitchPID.ki, config.pitchPID.kd, 0.05 * stabilizer.idleTicks)
     stabilizer.rollPID = PID:new(config.rollPID.kp, config.rollPID.ki, config.rollPID.kd, 0.05 * stabilizer.idleTicks)
+    stabilizer.yawPID = PID:new(config.yawPID.kp, config.yawPID.ki, config.yawPID.kd, 0.05 * stabilizer.idleTicks)
 
     stabilizer.lastYaw = 0
     stabilizer.yawVelocity = 0
-    stabilizer.smallAngVelocity = config.smallAngVelocity or 5
+    stabilizer.deadzone = config.deadzone or 5  -- Default deadzone in degrees
     
     return stabilizer
 end
@@ -246,6 +248,11 @@ end
 
 function stabilizer:doRotationStep()
     local yawVelocity = self:calculateYawVelocity()
+
+    if self.targetHeading == nil then
+        return
+    end
+
     local rotLarge = self.specialThrusterMap.rotLarge
     local rotSmall = self.specialThrusterMap.rotSmall
 
@@ -253,26 +260,50 @@ function stabilizer:doRotationStep()
         return
     end
 
-    -- Calculate error (positive means need to turn left, negative means right)
-    local velocityError = self.targetHeading - yawVelocity
+    -- Get current orientation
+    local _, currentYaw, _ = ship.getOrientation()
+    currentYaw = math.deg(currentYaw)
+
+    -- Calculate heading error
+    local yawError = self.targetHeading - currentYaw
+    -- Normalize to [-180, 180]
+    while yawError > 180 do yawError = yawError - 360 end
+    while yawError < -180 do yawError = yawError + 360 end
+
+    -- Check if yawError is within the deadzone
+    if math.abs(yawError) < self.deadzone then
+        return  -- Relinquish thrusters if within deadzone
+    end
+
+    -- Use angle PID to get desired velocity
+    local targetVelocity = self.yawPID:compute(0, yawError)
+
+    -- Use velocity PID to get thrust level
+    local velocityError = targetVelocity - yawVelocity
+
+    local thrustLevel = math.abs(yawError / 90.0)
+    thrustLevel = utils.clamp(thrustLevel, 0.0, 1.0)
     
     -- Clear previous reserved thrusters
     for name, _ in pairs(self.rotReservedThrusters) do
         self.rotReservedThrusters[name] = nil
     end
-
-    local thrustLevel = math.abs(velocityError) / 90.0  -- Scale based on error magnitude
-    thrustLevel = utils.clamp(thrustLevel, 0.0, 1.0)
     
-    if rotLarge and (math.abs(self.targetHeading) > self.smallAngVelocity or not rotSmall) then
-        print("AV: " .. yawVelocity .. ", VE: " .. velocityError, ", TV: " .. self.targetHeading, ", TYPE: LARGE")
+    -- Determine which thrusters to use based on required power and available options
+    local useLargeThrusters = rotLarge and (
+        math.abs(velocityError) > 30 or  -- Large velocity error
+        math.abs(yawError) > 45 or  -- Large angle error
+        not rotSmall  -- No small thrusters available
+    )
+    
+    if useLargeThrusters then
         -- Handle using large thrusters
         self.rotReservedThrusters[rotLarge.LEFT] = true
         self.rotReservedThrusters[rotLarge.RIGHT] = true
 
         local left, right = self.tapi.thrusters[rotLarge.LEFT], self.tapi.thrusters[rotLarge.RIGHT]
         local directionSupported = left.supportsDirectionControl() and right.supportsDirectionControl()
-        if velocityError > 0 then
+        if velocityError < 0 then  -- Need to turn left (negative error means we need more positive velocity)
             -- Turn left
             if directionSupported then
                 left.setDirection("reversed")
@@ -299,8 +330,6 @@ function stabilizer:doRotationStep()
         return
     end
 
-    print("AV: " .. yawVelocity .. ", VE: " .. velocityError, ", TV: " .. self.targetHeading, ", TYPE: SMALL")
-
     -- Else handle with small thrusters
     self.rotReservedThrusters[rotSmall.FL] = true
     self.rotReservedThrusters[rotSmall.BR] = true
@@ -315,7 +344,7 @@ function stabilizer:doRotationStep()
     local directionSupported = tFL.supportsDirectionControl() and tBR.supportsDirectionControl()
     and tFR.supportsDirectionControl() and tBL.supportsDirectionControl()
     
-    if velocityError > 0 then
+    if velocityError < 0 then  -- Need to turn left (negative error means we need more positive velocity)
         -- Turn left
         if directionSupported then
             tFR.setDirection("reversed")
@@ -367,7 +396,7 @@ end
 
 function stabilizer:setTarget(pos, heading)
     self.targetVector = Vector3.from_table(pos)
-    self.targetHeading = heading or self.targetHeading
+    self.targetHeading = heading
 end
 
 function stabilizer:doStep()

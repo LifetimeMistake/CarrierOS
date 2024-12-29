@@ -45,13 +45,10 @@ end
 
 function HoldStrategy:onLoad(autopilot)
     self.holdPosition = ship.getWorldspacePosition()
-    local _, yaw, _ = ship.getOrientation()
-    self.holdHeading = math.deg(yaw) -- Convert to degrees for storage
 end
 
 function HoldStrategy:onUnload(autopilot)
     self.holdPosition = nil
-    self.holdHeading = nil
 end
 
 function HoldStrategy:update(autopilot)
@@ -63,26 +60,9 @@ function HoldStrategy:update(autopilot)
     local direction = self.holdPosition - currentPosition
     local distance = direction:magnitude()
 
-    -- Calculate rotation needed to maintain stored heading
-    local _, currentYaw, _ = ship.getOrientation()
-    local currentYawDeg = math.deg(currentYaw)
-    local headingError = self.holdHeading - currentYawDeg
-    
-    -- Normalize the error to [-180, 180]
-    while headingError > 180 do headingError = headingError - 360 end
-    while headingError < -180 do headingError = headingError + 360 end
-
-    if math.abs(headingError) < 5 then
-        headingError = 0
-    end
-
-    local speedLimit = distance > 100 and autopilot.rotationSpeedLimit or autopilot.stabilizer.smallAngVelocity
-    -- Convert error to rotation speed (positive = rotate left, negative = rotate right)
-    local rotationSpeed = utils.clamp(headingError, -speedLimit, speedLimit)
-
     -- Set movement and rotation
     if distance < autopilot.arrivalThreshold then
-        autopilot.stabilizer:setTarget(ZERO_VECTOR, rotationSpeed)
+        autopilot.stabilizer:setTarget(ZERO_VECTOR, nil)
         return
     end
 
@@ -91,7 +71,7 @@ function HoldStrategy:update(autopilot)
         targetVelocity = targetVelocity * (distance / autopilot.slowdownThreshold)
     end
 
-    autopilot.stabilizer:setTarget(targetVelocity, rotationSpeed)
+    autopilot.stabilizer:setTarget(targetVelocity, nil)
 end
 
 function HoldStrategy:getTargetPosition()
@@ -106,15 +86,22 @@ function NavigateStrategy:new()
     local obj = Strategy:new()
     setmetatable(obj, self)
     obj.currentWaypoint = nil
+    obj.alignmentStart = 0
+    obj.alignmentDuration = 5
+    obj.isAligned = false
     return obj
 end
 
 function NavigateStrategy:onLoad(autopilot)
     self.currentWaypoint = autopilot.waypoints[1]
+    self.targetHeading = nil
+    self.alignmentStart = os.clock()
+    self.isAligned = false
 end
 
 function NavigateStrategy:onUnload(autopilot)
     self.currentWaypoint = nil
+    self.targetHeading = nil
 end
 
 function NavigateStrategy:update(autopilot)
@@ -132,48 +119,52 @@ function NavigateStrategy:update(autopilot)
     if distance < autopilot.arrivalThreshold then
         table.remove(autopilot.waypoints, 1)
         self.currentWaypoint = autopilot.waypoints[1]
+        self.alignmentStart = os.clock()
+        self.isAligned = false
+
         print("NAVIGATE strategy reached waypoint")
         return
     end
 
-    -- Calculate current heading and target heading
-    local _, currentYaw, _ = ship.getOrientation()
-    local currentYawDeg = math.deg(currentYaw)
-    
-    -- Calculate the direction to the target
-    local worldDirection = direction:normalize()
-    local targetHeading = math.deg(math.atan2(worldDirection.x, worldDirection.z))
-    
     -- Determine desired heading based on distance
     local desiredHeading
     if distance < autopilot.slowdownThreshold and self.currentWaypoint.heading ~= nil then
         desiredHeading = self.currentWaypoint.heading
+    elseif distance < autopilot.slowdownThreshold and self.targetHeading ~= nil then
+        desiredHeading = self.targetHeading
     else
-        desiredHeading = targetHeading
-    end
-    
-    -- Calculate heading error
-    local headingError = desiredHeading - currentYawDeg
-    
-    -- Normalize the error to [-180, 180]
-    while headingError > 180 do headingError = headingError - 360 end
-    while headingError < -180 do headingError = headingError + 360 end
-
-    if math.abs(headingError) < 5 then
-        headingError = 0
+        -- Calculate the direction to the target
+        local worldDirection = direction:normalize()
+        desiredHeading = math.deg(math.atan2(worldDirection.x, worldDirection.z))
+        self.targetHeading = desiredHeading
     end
 
-    local speedLimit = distance > 100 and autopilot.rotationSpeedLimit or autopilot.stabilizer.smallAngVelocity
-    -- Convert error to rotation speed (positive = rotate left, negative = rotate right)
-    local rotationSpeed = utils.clamp(headingError, -speedLimit, speedLimit)
+    if not self.isAligned then
+        -- New alignment check within a cone of 20 degrees
+        local _, currentHeading, _ = ship.getOrientation()
+        local headingError = math.abs(math.deg(currentHeading) - desiredHeading)
 
-    -- Set velocity and rotation
+        if headingError > 20 then
+            self.alignmentStart = os.clock()
+            autopilot.stabilizer:setTarget(ZERO_VECTOR, desiredHeading)
+            self.isAligned = false
+            return
+        else
+            if os.clock() - self.alignmentStart > self.alignmentDuration then
+                print("Autopilot aligned to travel direction")
+                self.isAligned = true
+            else
+                return
+            end
+        end
+    end
+    
     local targetVelocity = ship.worldToLocal(direction:normalize() * autopilot.speedLimit)
     if distance < autopilot.slowdownThreshold then
         targetVelocity = targetVelocity * (distance / autopilot.slowdownThreshold)
     end
 
-    autopilot.stabilizer:setTarget(targetVelocity, rotationSpeed)
+    autopilot.stabilizer:setTarget(targetVelocity, desiredHeading)
 end
 
 function NavigateStrategy:getTargetPosition()
