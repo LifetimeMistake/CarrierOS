@@ -48,6 +48,7 @@ end
 function Waypoints:add(name, pos, heading)
     local id = findNextFreeId(self.db)
     self.db[id] = {
+        id = id,
         name = name,
         pos = Vector3.to_table(pos),
         heading = heading
