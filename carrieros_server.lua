@@ -207,13 +207,7 @@ local normalState, config = loadSystemConfig()
 local profiles = loadThrustProfiles()
 local tapi = loadThrusterAPI(profiles, config.thrusterWindupTicks)
 local stabilizer = stabilizer_api.new(tapi, config)
-local autopilot = autopilot_api.new(
-    stabilizer,
-    config.autopilot.speedLimit,
-    config.autopilot.rotationSpeedLimit,
-    config.autopilot.slowdownThreshold,
-    config.autopilot.arrivalThreshold
-)
+local autopilot = autopilot_api.new(stabilizer, config.autopilot)
 
 local halt = false
 stabilizer:start()

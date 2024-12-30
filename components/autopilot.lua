@@ -82,21 +82,23 @@ end
 local NavigateStrategy = setmetatable({}, Strategy)
 NavigateStrategy.__index = NavigateStrategy
 
-function NavigateStrategy:new()
+function NavigateStrategy.new()
     local obj = Strategy:new()
-    setmetatable(obj, self)
+    setmetatable(obj, NavigateStrategy)
     obj.currentWaypoint = nil
-    obj.alignmentStart = 0
-    obj.alignmentDuration = 5
-    obj.isAligned = false
+    obj.targetHeading = nil
     return obj
+end
+
+function NavigateStrategy:resetAlignment(autopilot)
+    self.alignmentStart = os.clock()
+    self.alignmentDuration = autopilot
+    self.alignmentThreshold = autopilot.alignmentThreshold
 end
 
 function NavigateStrategy:onLoad(autopilot)
     self.currentWaypoint = autopilot.waypoints[1]
-    self.targetHeading = nil
-    self.alignmentStart = os.clock()
-    self.isAligned = false
+    self:resetAlignment(autopilot)
 end
 
 function NavigateStrategy:onUnload(autopilot)
@@ -119,9 +121,7 @@ function NavigateStrategy:update(autopilot)
     if distance < autopilot.arrivalThreshold then
         table.remove(autopilot.waypoints, 1)
         self.currentWaypoint = autopilot.waypoints[1]
-        self.alignmentStart = os.clock()
-        self.isAligned = false
-
+        self:resetAlignment(autopilot)
         print("NAVIGATE strategy reached waypoint")
         return
     end
@@ -140,14 +140,18 @@ function NavigateStrategy:update(autopilot)
     end
 
     if not self.isAligned then
-        -- New alignment check within a cone of 20 degrees
         local _, currentHeading, _ = ship.getOrientation()
+        local velocity = ship.getVelocity():magnitude()
         local headingError = math.abs(math.deg(currentHeading) - desiredHeading)
 
-        if headingError > 20 then
-            self.alignmentStart = os.clock()
+        -- Safeguard to prevent the ship from running off in case of unbalanced mass
+        if velocity > 5 then
+            desiredHeading = nil
+        end
+
+        if headingError > self.alignmentThreshold then
+            self:resetAlignment(autopilot)
             autopilot.stabilizer:setTarget(ZERO_VECTOR, desiredHeading)
-            self.isAligned = false
             return
         else
             if os.clock() - self.alignmentStart > self.alignmentDuration then
@@ -175,16 +179,18 @@ end
 local Autopilot = {}
 Autopilot.__index = Autopilot
 
-function Autopilot.new(stabilizer, speedLimit, rotationSpeedLimit, slowdownThreshold, arrivalThreshold)
+function Autopilot.new(stabilizer, config)
     local obj = setmetatable({}, Autopilot)
     obj.stabilizer = stabilizer
     obj.active = false
     obj.navigationActive = false
-    obj.speedLimit = speedLimit or 10
-    obj.rotationSpeedLimit = rotationSpeedLimit or 30
-    obj.slowdownThreshold = slowdownThreshold or 40
-    obj.arrivalThreshold = arrivalThreshold or 5
-    obj.strategyType = nil
+    obj.speedLimit = config.speedLimit or 10
+    obj.rotationSpeedLimit = config.rotationSpeedLimit or 30
+    obj.slowdownThreshold = config.slowdownThreshold or 40
+    obj.arrivalThreshold = config.arrivalThreshold or 5
+    obj.alignmentThreshold = config.alignmentThreshold or 15
+    obj.alignmentDuration = config.alignmentDuration or 5
+    obj.strategyType = "NONE"
     obj.currentStrategy = nil
     obj.waypoints = {}
     obj.strategies = {
@@ -192,12 +198,16 @@ function Autopilot.new(stabilizer, speedLimit, rotationSpeedLimit, slowdownThres
         NAVIGATE = NavigateStrategy:new()
     }
 
-    obj:setStrategy("HOLD")
     return obj
 end
 
 function Autopilot:setActive(state)
     self.active = state
+    if not state and self.currentStrategy ~= nil then
+        self.currentStrategy:onUnload(self)
+        self.currentStrategy = nil
+        self.strategyType = "NONE"
+    end
 end
 
 function Autopilot:isActive()
@@ -255,7 +265,9 @@ function Autopilot:update()
         return
     end
 
-    self.currentStrategy:update(self)
+    if self.currentStrategy then
+        self.currentStrategy:update(self)
+    end
 
     -- Cleanup and update state
     local wantedStrategy = (self.navigationActive and #self.waypoints > 0) and "NAVIGATE" or "HOLD"
