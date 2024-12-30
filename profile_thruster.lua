@@ -1,6 +1,6 @@
-local thrust_api = dofile("apis/thrusters.lua")
-local serialization = dofile("apis/serialization.lua")
-local math3d = dofile("apis/math3d.lua")
+local thrust_api = require("libs.thrusters")
+local serialization = require("libs.serialization")
+require("libs.shipExtensions")
 
 print("Enter integrator ID:")
 local integratorId = read()
@@ -18,14 +18,24 @@ local thrustSide = read()
 local engine = {
     integrator = integratorId,
     powerSide = powerSide,
-    thrustSide = thrustSide
+    thrustSide = thrustSide,
+    normalDirection = "normal",
+    thrustVector = {x = 0, y = 0, z = 0},
+    type = "default"
+}
+
+local defaultThrustProfile = {
+    default = {
+        type = "default", 
+        profile = {}
+    }
 }
 
 local engineMap = {
     main = engine
 }
 
-local status, api = thrust_api.init(engineMap, 1)
+local status, api = thrust_api.init(engineMap, defaultThrustProfile, 1)
 if not status then
     error("Failed to init engine API: " .. api)
 end
@@ -104,7 +114,7 @@ for i = 1, 15 do
 
     while elapsed <= simulation_length do
         local velocity = ship.getVelocity()
-        local delta_v = math3d.magnitude(math3d.subtract(velocity, last_velocity))
+        local delta_v = (velocity - last_velocity):magnitude()
         local acceleration = delta_v / delta_t
         if math.abs(stableY - base_y) > 0.1 then
             acceleration = acceleration + 10
