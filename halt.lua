@@ -9,13 +9,27 @@ if carrieros then
     return
 end
 
+-- Alternatively if CarrierOS fails we can manually halt the engines
+
+local defaultThrustProfile = {
+    default = {
+        type = "default", 
+        profile = {}
+    }
+}
+
 local function getThrusterAPI()
     local status, data = serialization.json.loadf(consts.THRUSTER_CONFIG_PATH)
     if not status then
         error("Failed to load engine map: " .. data)
     end
 
-    local status, data = thrust_api.init(data, 1)
+    -- Ignore thrust profile
+    for k,v in pairs(data) do
+        v.type = "default"
+    end
+
+    local status, data = thrust_api.init(data, defaultThrustProfile, 1)
     if not status then
         error("Failed to init engine API: " .. data)
     end
