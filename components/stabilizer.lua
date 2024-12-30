@@ -266,6 +266,7 @@ function stabilizer:doRotationStep()
     end
 
     -- Get current orientation
+    local pos = ship.getWorldspacePosition()
     local _, currentYaw, _ = ship.getOrientation()
     currentYaw = math.deg(currentYaw)
 
@@ -303,22 +304,45 @@ function stabilizer:doRotationStep()
         self.rotReservedThrusters[rotLarge.LEFT] = true
         self.rotReservedThrusters[rotLarge.RIGHT] = true
 
+        -- Since we're taking over the thrusters we need to factor in the wanted Z thrust
+        -- If reqForce < 0, subtract power from the normal thruster to have a negative velocity
+        -- If reqForce > 0, subtract power from the reverse thruster to have a positive velocity
+
         local reqForce = self.reqForce.z
         local left = self.tapi.thrusters[rotLarge.LEFT]
         local right = self.tapi.thrusters[rotLarge.RIGHT]
 
+        local function computeBias(posThruster, negThruster)
+            local posBias, negBias = 0, 0
+            if reqForce < 0 then
+                posBias = posThruster.getLevelFromForce(math.abs(reqForce), pos.y)
+            elseif reqForce > 0 then
+                negBias = negThruster.getLevelFromForce(math.abs(reqForce), pos.y)
+            end
+
+            return posBias, negBias
+        end
+        
         if velocityError < 0 then  -- Need to turn left (negative error means we need more positive velocity)
+            local posBias, negBias = computeBias(right, left)
+            local leftThrustLevel = utils.clamp(thrustLevel - negBias, 0, 1)
+            local rightThrustLevel = utils.clamp(thrustLevel - posBias, 0, 1)
+            print("LEFT, T: " .. self.targetHeading, "C: " .. currentYaw, ", Pb: " .. posBias, "Nb: " .. negBias, ", Ltt: " .. leftThrustLevel, ", Rtt: " .. rightThrustLevel)
             -- Turn left
             left.setDirection("reversed")
             right.setDirection("normal")
-            left.setLevel(thrustLevel)
-            right.setLevel(thrustLevel)
+            left.setLevel(leftThrustLevel)
+            right.setLevel(rightThrustLevel)
         else
+            local posBias, negBias = computeBias(left, right)
+            local leftThrustLevel = utils.clamp(thrustLevel - posBias, 0, 1)
+            local rightThrustLevel = utils.clamp(thrustLevel - negBias, 0, 1)
+            print("RIGHT, T: " .. self.targetHeading, "C: " .. currentYaw, ", Pb: " .. posBias, "Nb: " .. negBias, ", Ltt: " .. leftThrustLevel, ", Rtt: " .. rightThrustLevel)
             -- Turn right
             left.setDirection("normal")
             right.setDirection("reversed")
-            left.setLevel(thrustLevel)
-            right.setLevel(thrustLevel)
+            left.setLevel(leftThrustLevel)
+            right.setLevel(rightThrustLevel)
         end
         
         return
