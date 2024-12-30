@@ -129,7 +129,13 @@ end
 
 function thruster_api.setForce(data, force, height)
     local forcesTable = thruster_api.getForces(data, height)
+    local numForces = #forcesTable
     local closestIndex, closestForce
+
+    if force < (forcesTable[1] / 2) then
+        thruster_api.setLevel(data, 0)
+        return 0
+    end
 
     for i = 1, #forcesTable do
         if forcesTable[i] >= force then
@@ -143,16 +149,61 @@ function thruster_api.setForce(data, force, height)
     closestForce = closestForce or forcesTable[closestIndex]
 
     if closestIndex then
-        thruster_api.setLevel(data, (closestIndex - 1) / 15)
+        thruster_api.setLevel(data, closestIndex / numForces)
     end
 
     return closestForce
 end
 
+function thruster_api.setForceExact(data, force, height)
+    local level = thruster_api.getLevelFromForce(data, force, height)
+    thruster_api.setLevel(data, level)
+end
+
 function thruster_api.getForce(data, height)
     local level = thruster_api.getLevel(data)
-    local index = math.floor(level * 15) + 1
-    return thruster_api.getForces(data, height)[index]
+    local forcesTable = thruster_api.getForces(data, height)
+    local numForces = #forcesTable
+    local index = math.floor(level * numForces)
+    
+    if index == 0 then
+        return 0
+    end
+
+    return forcesTable[index]
+end
+
+function thruster_api.getLevelFromForce(data, force, height)
+    local forcesTable = thruster_api.getForces(data, height)
+    local numForces = #forcesTable
+
+    if force <= forcesTable[1] then
+        -- Interpolate level between 0 and forcesTable[1]
+        return (force / forcesTable[1]) / numForces
+    elseif force >= forcesTable[numForces] then
+        return 1
+    end
+
+    local lowerIndex, upperIndex = 1, numForces
+    for i = 1,numForces - 1 do
+        if forcesTable[i] <= force and forcesTable[i + 1] >= force then
+            lowerIndex = i
+            upperIndex = i + 1
+            break
+        end
+    end
+
+    local lowerForce = forcesTable[lowerIndex]
+    local upperForce = forcesTable[upperIndex]
+
+    local lowerLevel = lowerIndex / numForces
+    local upperLevel = upperIndex / numForces
+
+    -- Interpolate between two neighbouring levels
+    local interpolatedLevel = lowerLevel + 
+        ((force - lowerForce) / (upperForce - lowerForce)) * (upperLevel - lowerLevel)
+
+    return interpolatedLevel
 end
 
 function thruster_api.wrap(config, thrustProfile)

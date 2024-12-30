@@ -253,6 +253,7 @@ end
 function stabilizer:doRotationStep()
     local yawVelocity = self:calculateYawVelocity()
 
+    self.rotReservedThrusters = {}
     if self.targetHeading == nil then
         return
     end
@@ -288,11 +289,6 @@ function stabilizer:doRotationStep()
     local thrustLevel = math.abs(yawError / 90.0)
     thrustLevel = utils.clamp(thrustLevel, 0.0, 1.0)
     
-    -- Clear previous reserved thrusters
-    for name, _ in pairs(self.rotReservedThrusters) do
-        self.rotReservedThrusters[name] = nil
-    end
-    
     -- Determine which thrusters to use based on required power and available options
     local useLargeThrusters = rotLarge and (
         math.abs(velocityError) > 30 or  -- Large velocity error
@@ -307,7 +303,10 @@ function stabilizer:doRotationStep()
         self.rotReservedThrusters[rotLarge.LEFT] = true
         self.rotReservedThrusters[rotLarge.RIGHT] = true
 
-        local left, right = self.tapi.thrusters[rotLarge.LEFT], self.tapi.thrusters[rotLarge.RIGHT]
+        local reqForce = self.reqForce.z
+        local left = self.tapi.thrusters[rotLarge.LEFT]
+        local right = self.tapi.thrusters[rotLarge.RIGHT]
+
         if velocityError < 0 then  -- Need to turn left (negative error means we need more positive velocity)
             -- Turn left
             left.setDirection("reversed")
@@ -397,8 +396,8 @@ end
 
 function stabilizer:doStep()
     self:doTiltStep()
-    self:doRotationStep()
     self:doThrustStep()
+    self:doRotationStep()
 end
 
 function stabilizer:update()
