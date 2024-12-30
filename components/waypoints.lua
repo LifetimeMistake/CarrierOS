@@ -87,6 +87,7 @@ function Waypoints:get(id)
     end
 
     return {
+        id = id,
         name = waypoint.name,
         pos = Vector3.from_table(waypoint.pos),
         heading = waypoint.heading
