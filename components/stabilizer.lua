@@ -112,6 +112,10 @@ function stabilizer.new(thrusterAPI, config)
     stabilizer.lastYaw = 0
     stabilizer.yawVelocity = 0
     stabilizer.deadzone = config.deadzone or 5  -- Default deadzone in degrees
+
+    -- Diagnostics
+    stabilizer.forceDiff = Vector3.new(0, 0, 0)
+    stabilizer.reqForce = Vector3.new(0, 0, 0)
     
     return stabilizer
 end
@@ -296,35 +300,26 @@ function stabilizer:doRotationStep()
         not rotSmall  -- No small thrusters available
     )
     
+    -- Here we just assume that the thrusters support reverse thrust
+    -- Otherwise this type of control doesn't work anyway
     if useLargeThrusters then
         -- Handle using large thrusters
         self.rotReservedThrusters[rotLarge.LEFT] = true
         self.rotReservedThrusters[rotLarge.RIGHT] = true
 
         local left, right = self.tapi.thrusters[rotLarge.LEFT], self.tapi.thrusters[rotLarge.RIGHT]
-        local directionSupported = left.supportsDirectionControl() and right.supportsDirectionControl()
         if velocityError < 0 then  -- Need to turn left (negative error means we need more positive velocity)
             -- Turn left
-            if directionSupported then
-                left.setDirection("reversed")
-                left.setLevel(thrustLevel)
-            else
-                left.setLevel(0)
-            end
-
+            left.setDirection("reversed")
             right.setDirection("normal")
+            left.setLevel(thrustLevel)
             right.setLevel(thrustLevel)
         else
             -- Turn right
-            if directionSupported then
-                right.setDirection("reversed")
-                right.setLevel(thrustLevel)
-            else
-                right.setLevel(0)
-            end
-
             left.setDirection("normal")
+            right.setDirection("reversed")
             left.setLevel(thrustLevel)
+            right.setLevel(thrustLevel)
         end
         
         return
@@ -387,6 +382,7 @@ function stabilizer:doThrustStep()
     local reqAccel = self.targetVector - (vel + ship.worldToLocal(WORLD_GRAVITY))
     local reqForce = Vector3.componentWiseMultiply(reqAccel * mass, self.K)
 
+    self.reqForce = reqForce
     self.forceDiff = Vector3.new(
         self:solveComponent(vel, pos.y, reqForce, "x"),
         self:solveComponent(vel, pos.y, reqForce, "y"),
