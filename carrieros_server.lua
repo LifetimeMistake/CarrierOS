@@ -91,6 +91,8 @@ local function loadSystemConfig()
         autopilot = {
             speedLimit = 20,
             slowdownThreshold = 80,
+            alignmentDuration = 5,
+            alignmentThreshold = 15,
             arrivalThreshold = 2.5
         },
         DELTA_K = 0.0075,
