@@ -94,7 +94,7 @@ function stabilizer.new(thrusterAPI, config)
     stabilizer.tapi = thrusterAPI
     stabilizer.thrusters = thrusters
     stabilizer.targetVector = Vector3.new(0, 0, 0)
-    stabilizer.targetHeading = 0
+    stabilizer.targetHeading = nil
     stabilizer.K = config.K or Vector3.new(1, 1, 1)
     stabilizer.deltaK = config.DELTA_K or 0.0025
     stabilizer.idleTicks = utils.clamp(math.floor(20 / (config.tickRate or 20)), 1, 19)
