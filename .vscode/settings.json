@@ -32,7 +32,10 @@
         "write",
         "read",
         "sleep",
-        "ship"
+        "ship",
+        "services",
+        "process",
+        "api_factory"
     ],
     "Lua.runtime.builtin": {
         "bit32": "enable",
