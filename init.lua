@@ -30,8 +30,19 @@ services.register(
     }
 )
 
+services.register(
+    "player_detection",
+    "/services/players.lua",
+    {
+        restartPolicy = "on-failure:5",
+        loggerCapacity = 100,
+        privileged = false
+    }
+)
+
 services.start("carrieros_server")
 services.start("carrieros_rpc")
+services.start("player_detection")
 
 term.clear()
 term.setCursorPos(0, 0)
