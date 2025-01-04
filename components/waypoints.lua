@@ -1,4 +1,5 @@
 local serialization = require("libs.serialization")
+local event = require("libs.event")
 local math3d = require("libs.math3d")
 local Vector3 = math3d.Vector3
 
@@ -29,6 +30,11 @@ end
 
 local Waypoints = {}
 Waypoints.__index = Waypoints
+Waypoints.events = {
+    added = event.new("db_waypoint_added"),
+    updated = event.new("db_waypoint_updated"),
+    removed = event.new("db_waypoint_removed")
+}
 
 function Waypoints.new(databasePath, loadExisting)
     local db = loadDB(databasePath, loadExisting)
@@ -47,12 +53,15 @@ end
 
 function Waypoints:add(name, pos, heading)
     local id = findNextFreeId(self.db)
-    self.db[id] = {
+    local waypoint = {
         id = id,
         name = name,
         pos = Vector3.to_table(pos),
         heading = heading
     }
+
+    self.db[id] = waypoint
+    self.events.added(id, waypoint)
 end
 
 function Waypoints:remove(id)
@@ -60,7 +69,10 @@ function Waypoints:remove(id)
         return false
     end
 
+    local waypoint = self.db[id]
     self.db[id] = nil
+
+    self.events.removed(id, waypoint)
 end
 
 function Waypoints:update(id, data)
@@ -77,6 +89,7 @@ function Waypoints:update(id, data)
         waypoint[k] = v
     end
 
+    self.events.updated(id, data)
     return true
 end
 
