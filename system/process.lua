@@ -210,7 +210,10 @@ local function processSchedulerThread(eventData)
         end
 
         for pid, process in pairs(processes) do
-            if process.status == "running" and coroutine.status(process.entrypoint) ~= "dead" then
+            local processAlive = process.status == "running" and coroutine.status(process.entrypoint) ~= "dead"
+            local eligible = (not process.filter or not eventData[1]) or process.filter == eventData[1]
+            
+            if processAlive and eligible then
                 local ok, filter = coroutine.resume(process.entrypoint, table.unpack(eventData, 1, eventData.n))
                 if not ok then
                     log.error("Error in process " .. pid .. ": " .. tostring(filter))
