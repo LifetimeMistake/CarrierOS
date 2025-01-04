@@ -12,9 +12,9 @@ end
 
 services.register(
     "carrieros_server", 
-    "/carrieros_server.lua",
+    "/services/server.lua",
     {
-        restartPolicy = "on-failure:5",
+        restartPolicy = "on-failure:15",
         loggerCapacity = 100,
         privileged = true
     }
@@ -22,7 +22,7 @@ services.register(
 
 services.register(
     "carrieros_rpc", 
-    "/carrieros_rpc.lua",
+    "/services/rpc.lua",
     {
         restartPolicy = "on-failure:5",
         loggerCapacity = 100,
