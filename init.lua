@@ -40,9 +40,20 @@ services.register(
     }
 )
 
+services.register(
+    "welcome",
+    "/services/welcome.lua",
+    {
+        restartPolicy = "on-failure:5",
+        loggerCapacity = 100,
+        privileged = false
+    }
+)
+
 services.start("carrieros_server")
 services.start("carrieros_rpc")
 services.start("player_detection")
+services.start("welcome")
 
 term.clear()
 term.setCursorPos(0, 0)

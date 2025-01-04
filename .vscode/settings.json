@@ -35,7 +35,8 @@
         "ship",
         "services",
         "process",
-        "api_factory"
+        "api_factory",
+        "players"
     ],
     "Lua.runtime.builtin": {
         "bit32": "enable",
