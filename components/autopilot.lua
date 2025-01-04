@@ -189,7 +189,6 @@ Autopilot.__index = Autopilot
 Autopilot.events = {
     state_updated = event.new("autopilot_state_updated"),
     departing = event.new("autopilot_departing"),
-    target_updated = event.new("autopilot_target_updated"),
     strategy_updated = event.new("autopilot_strategy_updated"),
     waypoint_reached = event.new("autopilot_waypoint_reached"),
     navigation_complete = event.new("autopilot_navigation_complete"),
