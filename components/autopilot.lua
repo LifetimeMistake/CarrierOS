@@ -110,11 +110,7 @@ end
 
 function NavigateStrategy:update(autopilot)
     if #autopilot.waypoints == 0 then
-        if self.currentWaypoint ~= nil then
-            -- We have been navigating to some waypoint previously
-            autopilot.events.navigation_complete:fire()
-            self.currentWaypoint = nil
-        end
+        autopilot.events.navigation_complete:fire()
         autopilot:setStrategy("HOLD")
         return
     end
@@ -129,7 +125,11 @@ function NavigateStrategy:update(autopilot)
         table.remove(autopilot.waypoints, 1)
         self:resetAlignment(autopilot)
         print("NAVIGATE strategy reached waypoint")
+        
         autopilot.events.waypoint_reached:fire(self.currentWaypoint)
+        if #autopilot.waypoints == 0 then
+            autopilot.events.navigation_complete:fire()
+        end
         return
     end
 
