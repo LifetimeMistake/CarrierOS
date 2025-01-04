@@ -94,6 +94,7 @@ function NavigateStrategy:resetAlignment(autopilot)
     self.alignmentStart = os.clock()
     self.alignmentDuration = autopilot.alignmentDuration
     self.alignmentThreshold = autopilot.alignmentThreshold
+    self.isAligned = false
 end
 
 function NavigateStrategy:onLoad(autopilot)
