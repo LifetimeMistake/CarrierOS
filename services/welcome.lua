@@ -1,7 +1,32 @@
 local logging = require("libs.logging")
 local serialization = require("libs.serialization")
-
 local CONFIG_PATH = "/data/welcome.json"
+
+if not log then
+    print("Setting up own logger")
+    local logger = logging.Logger.new(100)
+
+    _G.log = {
+        debug = function(msg)
+            logger:debug(msg)
+        end,
+        info = function(msg)
+            logger:info(msg)
+        end,
+        warn = function(msg)
+            logger:warn(msg)
+        end,
+        error = function(msg)
+            logger:error(msg)
+        end,
+        instance = logger
+    }
+
+    logger:setHook(function(level, message)
+        level = logging.LogLevel.tostring(level)
+        print(string.format("[%s] %s", level, message))
+    end)
+end
 
 local function loadConfig()
     local defaults = {
@@ -31,32 +56,6 @@ end
 local chatBox
 local lastSeen = {}
 local config = loadConfig()
-
-if not log then
-    print("Setting up own logger")
-    local logger = logging.Logger.new(100)
-
-    _G.log = {
-        debug = function(msg)
-            logger:debug(msg)
-        end,
-        info = function(msg)
-            logger:info(msg)
-        end,
-        warn = function(msg)
-            logger:warn(msg)
-        end,
-        error = function(msg)
-            logger:error(msg)
-        end,
-        instance = logger
-    }
-
-    logger:setHook(function(level, message)
-        level = logging.LogLevel.tostring(level)
-        print(string.format("[%s] %s", level, message))
-    end)
-end
 
 log.info("Looking for chatBox peripheral...")
 while not chatBox do
