@@ -37,7 +37,7 @@ function Vector3.__unm(v)
 end
 
 function Vector3.__lt(v1, v2)
-    return Vector3.magnitude(v1) < Vector3.magnitude(v2)
+    return Vector3.magnitudeSquared(v1) < Vector3.magnitudeSquared(v2)
 end
 
 function Vector3.__eq(v1, v2)
@@ -45,7 +45,7 @@ function Vector3.__eq(v1, v2)
 end
 
 function Vector3.__le(v1, v2)
-    return Vector3.magnitude(v1) <= Vector3.magnitude(v2)
+    return Vector3.magnitudeSquared(v1) <= Vector3.magnitudeSquared(v2)
 end
 
 function Vector3.__tostring(v)
@@ -66,6 +66,10 @@ function Vector3.cross(v1, v2)
         v1.z * v2.x - v1.x * v2.z,
         v1.x * v2.y - v1.y * v2.x
     )
+end
+
+function Vector3:magnitudeSquared()
+    return self.x * self.x + self.y * self.y + self.z * self.z
 end
 
 function Vector3:magnitude()
