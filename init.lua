@@ -31,12 +31,23 @@ services.register(
 )
 
 services.register(
+    "carrieros_notifications",
+    "/services/notifications.lua",
+    {
+        restartPolicy = "on-failure:5",
+        loggerCapacity = 100,
+        privileged = false
+    }
+)
+
+
+services.register(
     "player_detection",
     "/services/players.lua",
     {
         restartPolicy = "on-failure:5",
         loggerCapacity = 100,
-        privileged = false
+        privileged = true
     }
 )
 
@@ -52,6 +63,7 @@ services.register(
 
 services.start("carrieros_server")
 services.start("carrieros_rpc")
+services.start("carrieros_notifications")
 services.start("player_detection")
 services.start("welcome")
 
