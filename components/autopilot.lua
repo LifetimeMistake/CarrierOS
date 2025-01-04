@@ -1,5 +1,6 @@
 local math3d = require("libs.math3d")
 local utils = require("libs.utils")
+local event = require("libs.event")
 local Vector3 = math3d.Vector3
 local ZERO_VECTOR = Vector3.new(0, 0, 0)
 
@@ -109,6 +110,11 @@ end
 
 function NavigateStrategy:update(autopilot)
     if #autopilot.waypoints == 0 then
+        if self.currentWaypoint ~= nil then
+            -- We have been navigating to some waypoint previously
+            autopilot.events.navigation_complete:fire()
+            self.currentWaypoint = nil
+        end
         autopilot:setStrategy("HOLD")
         return
     end
@@ -121,9 +127,9 @@ function NavigateStrategy:update(autopilot)
 
     if distance < autopilot.arrivalThreshold then
         table.remove(autopilot.waypoints, 1)
-        self.currentWaypoint = autopilot.waypoints[1]
         self:resetAlignment(autopilot)
         print("NAVIGATE strategy reached waypoint")
+        autopilot.events.waypoint_reached:fire(self.currentWaypoint)
         return
     end
 
@@ -158,6 +164,7 @@ function NavigateStrategy:update(autopilot)
             if os.clock() - self.alignmentStart > self.alignmentDuration then
                 print("Autopilot aligned to travel direction")
                 self.isAligned = true
+                autopilot.events.departing:fire(self.currentWaypoint)
             else
                 return
             end
@@ -179,6 +186,14 @@ end
 -- Define the Autopilot Class
 local Autopilot = {}
 Autopilot.__index = Autopilot
+Autopilot.events = {
+    state_updated = event.new("autopilot_state_updated"),
+    departing = event.new("autopilot_departing"),
+    target_updated = event.new("autopilot_target_updated"),
+    strategy_updated = event.new("autopilot_strategy_updated"),
+    waypoint_reached = event.new("autopilot_waypoint_reached"),
+    navigation_complete = event.new("autopilot_navigation_complete"),
+}
 
 function Autopilot.new(stabilizer, config)
     local obj = setmetatable({}, Autopilot)
@@ -203,12 +218,19 @@ function Autopilot.new(stabilizer, config)
 end
 
 function Autopilot:setActive(state)
+    local prevState = self.active
+    if prevState == state then
+        return
+    end
+
     self.active = state
     if not state and self.currentStrategy ~= nil then
         self.currentStrategy:onUnload(self)
         self.currentStrategy = nil
         self.strategyType = "NONE"
     end
+
+    self.events.state_updated:fire(prevState, state, self.navigationActive, self.navigationActive)
 end
 
 function Autopilot:isActive()
@@ -216,7 +238,13 @@ function Autopilot:isActive()
 end
 
 function Autopilot:setNavigationActive(state)
+    local prevState = self.navigationActive
+    if prevState == state then
+        return
+    end
+
     self.navigationActive = state
+    self.events.state_updated:fire(self.active, self.active, prevState, state)
 end
 
 function Autopilot:isNavigationActive()
@@ -225,6 +253,11 @@ end
 
 function Autopilot:setStrategy(strategyType)
     if self.strategies[strategyType] then
+        local prevStrategy = self.currentStrategy
+        if prevStrategy == strategyType then
+            return
+        end
+        
         print("Entering autopilot strategy: " .. strategyType)
         if self.currentStrategy then
             self.currentStrategy:onUnload(self)
@@ -232,6 +265,8 @@ function Autopilot:setStrategy(strategyType)
         self.strategyType = strategyType
         self.currentStrategy = self.strategies[strategyType]
         self.currentStrategy:onLoad(self)
+
+        self.events.strategy_updated:fire(prevStrategy, strategyType)
     else
         error("Invalid strategy type: " .. strategyType)
     end
