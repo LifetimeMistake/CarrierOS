@@ -173,7 +173,7 @@ function safePeripheralLib.find(ty, filter)
 
     local results = {}
     for _, name in ipairs(safePeripheralLib.getNames()) do
-        if peripheral.hasType(name, ty) then
+        if peripheral.hasType(name, ty) and hasWriteAccess(name) then
             local wrapped = safePeripheralLib.wrap(name)
             if filter == nil or filter(name, wrapped) then
                 table.insert(results, wrapped)
