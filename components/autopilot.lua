@@ -125,7 +125,7 @@ function NavigateStrategy:update(autopilot)
         table.remove(autopilot.waypoints, 1)
         self:resetAlignment(autopilot)
         print("NAVIGATE strategy reached waypoint")
-        
+
         autopilot.events.waypoint_reached:fire(self.currentWaypoint)
         if #autopilot.waypoints == 0 then
             autopilot.events.navigation_complete:fire()
@@ -150,6 +150,11 @@ function NavigateStrategy:update(autopilot)
         local _, currentHeading, _ = ship.getOrientation()
         local velocity = ship.getVelocity():magnitude()
         local headingError = math.abs(math.deg(currentHeading) - desiredHeading)
+
+        if distance < autopilot.slowdownThreshold / 2 then
+            self.isAligned = true
+            return
+        end
 
         -- Safeguard to prevent the ship from running off in case of unbalanced mass
         if velocity > 5 then
