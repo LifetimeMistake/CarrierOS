@@ -167,7 +167,7 @@ function safePeripheralLib.find(ty, filter)
     if type(ty) ~= "string" then
         error(string.format("bad argument #1 to 'find' (expected string, got %s)", type(ty)))
     end
-    if type(ty) ~= "function" and type(ty) ~= "nil" then
+    if type(filter) ~= "function" and type(filter) ~= "nil" then
         error(string.format("bad argument #2 to 'find' (expected function, got %s)", type(filter)))
     end
 
